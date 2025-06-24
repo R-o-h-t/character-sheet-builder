@@ -1,44 +1,51 @@
 'use client';
 
-import React, { useRef, useCallback } from 'react';
 import {
+  Background,
+  BackgroundVariant,
+  DefaultEdgeOptions,
+  Edge,
+  HandleType,
+  MarkerType,
+  Node,
+  OnConnect,
+  OnReconnect,
   ReactFlow,
+  ReactFlowProps,
   ReactFlowProvider,
   addEdge,
+  reconnectEdge,
   useEdgesState,
-  Controls,
-  useReactFlow,
-  Background,
-  MiniMap,
-  BackgroundVariant,
-  NodeChange,
-  applyNodeChanges,
+  useNodesState,
+  useReactFlow
 } from '@xyflow/react';
+import React, { useCallback, useRef } from 'react';
 
+import { DndTypeProvider } from '@/lib/context/dnd.context';
 import '@xyflow/react/dist/style.css';
+import { nanoid } from 'nanoid';
+import { addNode, getNodeDefinition, nodeTypes } from './node-registry';
 import DndSidebar from './sidebar';
 
-import { NodeData, useSheetStore } from '@/lib/stores/sheetStore';
 import { useDnd } from '@/lib/context/dnd.context';
+import FloatingEdge from './floating-edge/floating-edge';
+import FloatingConnectionLine from './floating-edge/floating-connection-line';
 
 
+const initNodes: Node[] = [];
 
-
-const initialEdges: { id: string; source: string; target: string }[] = [];
+const initialEdges: Edge[] = [];
 
 
 
 const DnDFlow = () => {
   const reactFlowWrapper = useRef(null);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initNodes);
+
   const { screenToFlowPosition } = useReactFlow();
 
   const { type } = useDnd();
-  const { nodes, addNode, setNodes } = useSheetStore();
-
-  const onConnect = useCallback((params: any) => {
-    setEdges((eds) => addEdge(params, eds));
-  }, []);
 
   const onDragOver: React.DragEventHandler<HTMLDivElement> = useCallback((event) => {
     event.preventDefault();
@@ -48,18 +55,21 @@ const DnDFlow = () => {
   const onDrop: React.DragEventHandler<HTMLDivElement> = useCallback(
     (event) => {
       event.preventDefault();
-      const nodeDef = getNodeDefinition(type);
-      if (!nodeDef) return;
 
       const position = screenToFlowPosition({
         x: event.clientX,
         y: event.clientY,
       });
 
-      addNode(
-        nodeDef.type,
+      const newNode = addNode({
+        type,
         position,
-      );
+      });
+
+      if (newNode) {
+        setNodes((nds) => nds.concat(newNode));
+      }
+
     },
     [screenToFlowPosition, type]
   );
@@ -70,12 +80,33 @@ const DnDFlow = () => {
     event.dataTransfer.effectAllowed = 'move';
   };
 
+  const edgeReconnectSuccessful = useRef(true);
 
-  const onNodesChange = useCallback((changes: NodeChange[]) => {
-    return setNodes(applyNodeChanges<NodeData>(changes, nodes));
-  }, [setNodes, nodes]);
+  const onReconnect: OnReconnect<Edge> = useCallback(
+    (oldEdge, newConnection) => {
+      edgeReconnectSuccessful.current = true;
+      setEdges((els) => reconnectEdge(oldEdge, newConnection, els));
+    },
+    [],
+  );
 
 
+  const onConnect: OnConnect = useCallback(
+    (params) => setEdges((els) => addEdge(params, els)),
+    [],
+  );
+
+  const onReconnectStart = useCallback(() => {
+    edgeReconnectSuccessful.current = false;
+  }, []);
+
+  const onReconnectEnd = useCallback((_: unknown, edge: Edge) => {
+    if (!edgeReconnectSuccessful.current) {
+      setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+    }
+
+    edgeReconnectSuccessful.current = true;
+  }, []);
 
   return (
     <div className="relative h-full w-full">
@@ -83,17 +114,21 @@ const DnDFlow = () => {
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
+          onNodesChange={onNodesChange}
+          onReconnect={onReconnect}
+          onReconnectStart={onReconnectStart}
+          onReconnectEnd={onReconnectEnd}
           onConnect={onConnect}
           onDrop={onDrop}
           onDragStart={onDragStart}
           onDragOver={onDragOver}
           fitView
           nodeTypes={nodeTypes}
+          snapToGrid
+          snapGrid={[15, 15]}
+          attributionPosition="top-right"
         >
-          <Controls />
-          <MiniMap />
           <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
         </ReactFlow>
       </div>
@@ -102,8 +137,6 @@ const DnDFlow = () => {
   );
 };
 
-import { DndTypeProvider } from '@/lib/context/dnd.context';
-import { getNodeDefinition, nodeTypes } from './node-registry';
 
 export default function Page() {
   return (
