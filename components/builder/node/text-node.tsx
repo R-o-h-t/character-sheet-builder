@@ -8,7 +8,7 @@ import { CaseUpper } from "lucide-react";
 const properties = {
   value: {
     label: "Value",
-    type: "text" as const,
+    type: "string" as const,
     value: "New Text",
   },
   alignmentX: {
@@ -50,7 +50,7 @@ function TextNode({ id, data, selected }: NodeProps<Node<TextNodeProperties>>) {
         )}>
         {data.isModifiable ? (
           <input
-            type="text"
+            type="string"
             value={data.value}
             onChange={(e) => updateNodeData(id, { value: e.target.value })}
             className={cn("bg-transparent border-b border-gray-300 focus:outline-none focus:border-blue-500 text-center w-full max-w-full",
@@ -98,7 +98,7 @@ const getTextAlignmentClass = (alignment: string) => {
 
 
 export const definition: NodeDefinition<TextNodeProperties> = {
-  type: 'text',
+  type: "string",
   icon: CaseUpper,
   label: 'Text Node',
   properties,

@@ -259,7 +259,7 @@ export function NodeDataUpdateForm({ id }: { id: string }) {
       {definition?.properties &&
         Object.entries(definition.properties).map(([key, prop]) => {
           switch (prop.type) {
-            case 'text':
+            case "string":
               return (
                 <NodeDataTextUpdater
                   key={key}
@@ -283,10 +283,11 @@ export function NodeDataUpdateForm({ id }: { id: string }) {
                   key={key}
                   label={prop.label || key}
                   value={node.data[key] as string}
-                  options={(prop.options || []).map((option) => ({
-                    label: option,
-                    value: option,
-                  }))}
+                  options={(
+                    prop.options || (node.data.options as string[]) || []).map((option) => ({
+                      label: option,
+                      value: option,
+                    }))}
                   onChange={(value) => _updateNodeData(key, value)}
                 />
               );
@@ -337,12 +338,7 @@ export function NodeDataUpdateForm({ id }: { id: string }) {
                   onChange={(value) => _updateNodeData(key, value)}
                 />
               );
-            default:
-              return (
-                <div key={key} className="text-red-500">
-                  Unsupported property type: {prop.type}
-                </div>
-              );
+
           }
         })}
     </div>
@@ -370,7 +366,7 @@ export function NodeDataIdUpdater({
     <div className="flex items-center gap-2">
       <label className="text-sm font-medium">{label}:</label>
       <input
-        type="text"
+        type="string"
         value={value}
         onChange={(e) => handleChange(e)}
         pattern="[A-Z_]+"
@@ -496,7 +492,7 @@ export function NodeDataTextUpdater({
     <div className="flex items-center gap-2">
       <label className="text-sm font-medium">{label}:</label>
       <input
-        type="text"
+        type="string"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="border p-1 rounded w-full"

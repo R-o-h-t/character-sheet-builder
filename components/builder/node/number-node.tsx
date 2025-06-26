@@ -58,7 +58,7 @@ function NumberNode({ id, data, selected }: NodeProps<Node<NumberNodeProperties>
               <Minus className="h-4 w-4" />
             </Button>
             <input
-              type="text"
+              type="string"
               value={data.value}
               onChange={(e) => {
                 updateNodeData(id, { value: Number(e.target.value) });

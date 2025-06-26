@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Handle, Position, NodeResizer, NodeToolbar, useReactFlow, useNodeConnections, Connection } from '@xyflow/react';
+import { Handle, Position, NodeResizer, NodeToolbar, useReactFlow, useNodeConnections, Connection, Edge } from '@xyflow/react';
 import { Trash } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -32,6 +32,12 @@ export function Resizable({
         onDisconnect?: (connections: Connection[]) => void;
       } | null;
     }
+    edges?: {
+      highlightedConnectionsTo?: string[];
+      highlightedColor?: string;
+      animateHighlight?: boolean;
+      color?: string;
+    };
   };
 }) {
 
@@ -111,20 +117,28 @@ export function Resizable({
 
 
   useEffect(() => {
-
     const edges = getEdges();
     const updatedEdges = edges.map(edge => ({
       ...edge,
       style: {
         ...edge.style,
         opacity: (edge.source === id || edge.target === id) && selected ? 1 : 0.4,
-        stroke: (edge.source === id || edge.target === id) && selected ? '#ff0071' : '#ccc',
-
+        stroke: (isHighlighted(edge) && options?.edges?.highlightedColor) ? options?.edges?.highlightedColor : isSelected(edge) ? options?.edges?.color || '#ff0071' : '#ccc',
         transition: 'opacity 0.2s ease'
-      }
+      },
     }));
     setEdges(updatedEdges);
-  }, [selected, id, getEdges, setEdges]);
+  }, [selected, id, getEdges, setEdges, options?.edges?.highlightedConnectionsTo]);
+
+
+
+  function isHighlighted(edge: Edge) {
+    return (edge.source === id || edge.target === id) && selected && (options?.edges?.highlightedConnectionsTo?.includes(edge.target) || options?.edges?.highlightedConnectionsTo?.includes(edge.source));
+  }
+
+  function isSelected(edge: Edge) {
+    return (edge.source === id || edge.target === id) && selected;
+  }
 
   return (
     <>

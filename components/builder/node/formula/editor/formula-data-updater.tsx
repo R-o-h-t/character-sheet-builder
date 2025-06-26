@@ -38,7 +38,7 @@ export function NodeDataFormulaUpdater({
 
       {!showFormulaEditor ? (
         <input
-          type="text"
+          type="string"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           className="border p-1 rounded w-full"

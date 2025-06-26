@@ -2,12 +2,13 @@ import { definition as TextNode } from './node/text-node';
 import { definition as NumberNode } from './node/number-node';
 import { definition as FormulaNode } from './node/formula/formula-node';
 import { definition as IdNode } from './node/id-node';
+import { definition as SelectNode } from './node/select-node';
 import { LucideIcon } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { BaseNodeProperties, baseProperties, generateBaseProperties, generateReadableId } from './node/base/base-node-properties';
 // Import others here
 
-export const nodeRegistry: NodeDefinition[] = [TextNode, NumberNode, FormulaNode, IdNode /*, ...other nodes */];
+export const nodeRegistry: NodeDefinition[] = [TextNode, NumberNode, FormulaNode, IdNode, SelectNode /*, ...other nodes */];
 
 // For React Flow nodeTypes:
 export const nodeTypes = Object.fromEntries(
@@ -23,7 +24,7 @@ export type NodeProperty<T = any> = {
   label?: string;
   hidden?: boolean;
   value: T;
-  type: 'text' | 'number' | 'boolean' | 'select' | 'color' | 'date' | 'formula' | 'id'
+  type: 'string' | 'number' | 'boolean' | 'select' | 'color' | 'date' | 'formula' | 'id' | 'options';
   options?: string[];
 }
 
