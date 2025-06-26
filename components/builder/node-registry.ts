@@ -1,10 +1,13 @@
 import { definition as TextNode } from './node/text-node';
-import { definition as NumberNode } from './node/number-input-node';
+import { definition as NumberNode } from './node/number-node';
+import { definition as FormulaNode } from './node/formula/formula-node';
+import { definition as IdNode } from './node/id-node';
 import { LucideIcon } from 'lucide-react';
 import { nanoid } from 'nanoid';
+import { BaseNodeProperties, baseProperties, generateBaseProperties, generateReadableId } from './node/base/base-node-properties';
 // Import others here
 
-export const nodeRegistry: NodeDefinition[] = [TextNode, NumberNode /*, ...other nodes */];
+export const nodeRegistry: NodeDefinition[] = [TextNode, NumberNode, FormulaNode, IdNode /*, ...other nodes */];
 
 // For React Flow nodeTypes:
 export const nodeTypes = Object.fromEntries(
@@ -18,15 +21,16 @@ export const getNodeDefinition = (type: string) =>
 
 export type NodeProperty<T = any> = {
   label?: string;
+  hidden?: boolean;
   value: T;
-  type: 'text' | 'number' | 'boolean' | 'select' | 'color' | 'date';
-  options?: string[]; // For select type
+  type: 'text' | 'number' | 'boolean' | 'select' | 'color' | 'date' | 'formula' | 'id'
+  options?: string[];
 }
 
 export type NodeProperties = Record<string, NodeProperty<any>>;
 
 
-export type NodeDefinition<T extends NodeProperties = any> = {
+export type NodeDefinition<T extends NodeProperties = NodeProperties> = {
   type: string;
   icon: LucideIcon;
   label: string;
@@ -35,19 +39,26 @@ export type NodeDefinition<T extends NodeProperties = any> = {
   isResizable?: boolean;
   isModifiable?: boolean;
   properties?: T
+  description?: string;
+  info?: string;
+  category?: string;
 }
 
-export type NodeDataFromProperties<T extends NodeProperties> = {
+export type NodeDataFromProperties<T extends NodeProperties, U = any> = {
   isModifiable?: boolean;
   isResizable?: boolean;
+  value?: U;
+  ref: string;
 } & {
   [K in keyof T]: T[K]['value']
+} & {
+  [K in keyof BaseNodeProperties]: BaseNodeProperties[K]['value']
 };
 
-export type Node<T extends NodeProperties = NodeProperties> = {
+export type Node<T extends NodeProperties = NodeProperties, U = any> = {
   id: string;
   type: string;
-  data: NodeDataFromProperties<T>;
+  data: NodeDataFromProperties<T, U>;
   position: { x: number; y: number };
   selected?: boolean;
   width?: number;
@@ -79,8 +90,11 @@ export function addNode({
       isModifiable: nodeDef.isModifiable ?? true,
       isResizable: nodeDef.isResizable ?? true,
       ...defaultPropertiesValues,
+      ...generateBaseProperties(),
+      ref: generateReadableId(),
     },
     width: nodeDef.defaultSize?.width,
     height: nodeDef.defaultSize?.height,
   };
 }
+

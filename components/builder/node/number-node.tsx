@@ -3,7 +3,8 @@ import { Resizable } from "./base/node-resizer";
 import { NodeProps, useReactFlow } from "@xyflow/react";
 import { Button } from "@/components/ui/button";
 import { Hash, Minus, Plus } from "lucide-react";
-import { Node, NodeDefinition, NodeProperties, NodeProperty } from "../node-registry";
+import { Node, NodeDefinition } from "../node-registry";
+import { BaseNodeProperties } from "./base/base-node-properties";
 
 const numberNodeData = {
   value: {
@@ -23,7 +24,7 @@ const numberNodeData = {
   },
 };
 
-type NumberNodeProperties = typeof numberNodeData;
+type NumberNodeProperties = typeof numberNodeData
 
 const defaultSize = { width: 160, height: 50 };
 
@@ -38,7 +39,12 @@ function NumberNode({ id, data, selected }: NodeProps<Node<NumberNodeProperties>
         isResizable: true,
         minWidth: defaultSize.width,
         minHeight: defaultSize.height,
-      }} >
+        handles: {
+          target: null,
+        },
+      }}
+
+    >
       <div className="w-full h-full p-4 flex items-center justify-between overflow-hidden flex-nowrap number-sm number-gray-700">
         {data.isModifiable ? (
           <>
@@ -74,7 +80,7 @@ function NumberNode({ id, data, selected }: NodeProps<Node<NumberNodeProperties>
           <span>{data.value}</span>
         )}
       </div>
-    </Resizable>
+    </Resizable >
   );
 }
 

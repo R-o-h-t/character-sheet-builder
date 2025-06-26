@@ -3,15 +3,11 @@
 import {
   Background,
   BackgroundVariant,
-  DefaultEdgeOptions,
   Edge,
-  HandleType,
-  MarkerType,
   Node,
   OnConnect,
   OnReconnect,
   ReactFlow,
-  ReactFlowProps,
   ReactFlowProvider,
   addEdge,
   reconnectEdge,
@@ -23,13 +19,11 @@ import React, { useCallback, useRef } from 'react';
 
 import { DndTypeProvider } from '@/lib/context/dnd.context';
 import '@xyflow/react/dist/style.css';
-import { nanoid } from 'nanoid';
-import { addNode, getNodeDefinition, nodeTypes } from './node-registry';
+import { addNode, nodeTypes } from './node-registry';
 import DndSidebar from './sidebar';
 
 import { useDnd } from '@/lib/context/dnd.context';
-import FloatingEdge from './floating-edge/floating-edge';
-import FloatingConnectionLine from './floating-edge/floating-connection-line';
+import NodeDataMenu from './data-menu';
 
 
 const initNodes: Node[] = [];
@@ -133,6 +127,7 @@ const DnDFlow = () => {
         </ReactFlow>
       </div>
       <DndSidebar />
+      <NodeDataMenu />
     </div>
   );
 };

@@ -2,13 +2,12 @@ import { memo } from "react";
 import { Resizable } from "./base/node-resizer";
 import { cn } from "@/lib/utils";
 import { NodeProps, useReactFlow } from "@xyflow/react";
-import { Node, NodeDefinition, NodeProperties } from '../node-registry';
+import { Node, NodeDefinition } from '../node-registry';
 import { CaseUpper } from "lucide-react";
 
-
 const properties = {
-  text: {
-    label: "Text",
+  value: {
+    label: "Value",
     type: "text" as const,
     value: "New Text",
   },
@@ -16,7 +15,7 @@ const properties = {
     label: "Horizontal Alignment",
     type: "select" as const,
     options: ["left", "center", "right"],
-    value: "center",
+    value: "left",
   },
   alignmentY: {
     label: "Vertical Alignment",
@@ -41,32 +40,61 @@ function TextNode({ id, data, selected }: NodeProps<Node<TextNodeProperties>>) {
         isResizable: data.isResizable !== false,
         minWidth: defaultSize.width,
         minHeight: defaultSize.height,
+        handles: {
+          target: null,
+        },
       }} >
       <div className={
-        cn("w-full h-full p-4 overflow-hidden",
-          data.alignmentX === "left" ? "text-left" :
-            data.alignmentX === "center" ? "text-center" :
-              data.alignmentX === "right" ? "text-right" : "",
-          data.alignmentY === "top" ? "justify-start" :
-            data.alignmentY === "center" ? "justify-center" :
-              data.alignmentY === "bottom" ? "justify-end" : "",
+        cn("w-full h-full p-4 flex overflow-hidden",
+          getAlignmentClass(data.alignmentX, 'X'),
         )}>
-        <div className="text-sm text-gray-700">
-          {data.isModifiable ? (
-            <input
-              type="text"
-              value={data.text}
-              onChange={(e) => updateNodeData(id, { text: e.target.value })}
-              className="w-full bg-transparent border-b border-gray-300 focus:outline-none focus:border-blue-500"
-            />
-          ) : (
-            data.text
-          )}
-        </div>
+        {data.isModifiable ? (
+          <input
+            type="text"
+            value={data.value}
+            onChange={(e) => updateNodeData(id, { value: e.target.value })}
+            className={cn("bg-transparent border-b border-gray-300 focus:outline-none focus:border-blue-500 text-center w-full max-w-full",
+              getTextAlignmentClass(data.alignmentX),
+            )}
+          />
+        ) : (
+          data.value
+        )}
       </div>
     </Resizable>
   );
 }
+
+
+const getAlignmentClass = (alignment: string, axis: 'X' | 'Y') => {
+  switch (alignment) {
+    case 'left':
+      return axis === 'X' ? 'justify-start' : 'items-start';
+    case 'center':
+      return axis === 'X' ? 'justify-center' : 'items-center';
+    case 'right':
+      return axis === 'X' ? 'justify-end' : 'items-end';
+    case 'top':
+      return axis === 'Y' ? 'items-start' : '';
+    case 'bottom':
+      return axis === 'Y' ? 'items-end' : '';
+    default:
+      return '';
+  }
+}
+
+const getTextAlignmentClass = (alignment: string) => {
+  switch (alignment) {
+    case 'left':
+      return 'text-left';
+    case 'center':
+      return 'text-center';
+    case 'right':
+      return 'text-right';
+    default:
+      return '';
+  }
+};
 
 
 export const definition: NodeDefinition<TextNodeProperties> = {
