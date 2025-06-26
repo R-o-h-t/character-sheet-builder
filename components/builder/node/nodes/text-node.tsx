@@ -1,9 +1,9 @@
 import { memo } from "react";
-import { Resizable } from "./base/node-resizer";
 import { cn } from "@/lib/utils";
 import { NodeProps, useReactFlow } from "@xyflow/react";
-import { Node, NodeDefinition } from '../node-registry';
 import { CaseUpper } from "lucide-react";
+import { Resizable } from "../base/node-resizer";
+import { Node, NodeDefinition } from "../../node-registry";
 
 const properties = {
   value: {
@@ -107,3 +107,6 @@ export const definition: NodeDefinition<TextNodeProperties> = {
   isResizable: true,
   isModifiable: true,
 };
+
+
+export default definition;

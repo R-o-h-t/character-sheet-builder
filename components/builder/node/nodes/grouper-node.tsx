@@ -1,27 +1,19 @@
-// this nodes value sets the id of the target node
-
-
 import { Button } from "@/components/ui/button";
 import { NodeProps, useNodeConnections, useNodesData, useReactFlow } from "@xyflow/react";
-import { ArrowDownToDot, Copy } from "lucide-react";
-import { memo, useMemo } from "react";
+import { Copy, Group } from "lucide-react";
+import { memo, useMemo } from 'react';
 import { toast } from "sonner";
-import { Node, NodeDefinition } from '../node-registry';
-import { Resizable } from "./base/node-resizer";
+import { Node, NodeDefinition } from '../../node-registry';
+import { Resizable } from "../base/node-resizer";
 
 const properties = {
-  ref: {
-    label: "ID",
-    type: "id" as const,
-    value: "",
-  },
 };
 
-type RefNodeProperties = typeof properties;
+type GrouperNodeProperties = typeof properties;
 
-const defaultSize = { width: 160, height: 50 };
+const defaultSize = { width: 180, height: 60 };
 
-function RefNode({ id, data, selected }: NodeProps<Node<RefNodeProperties>>) {
+function GrouperNode({ id, data, selected }: NodeProps<Node<GrouperNodeProperties>>) {
 
   const { updateNodeData, getNode } = useReactFlow<Node>();
 
@@ -43,10 +35,21 @@ function RefNode({ id, data, selected }: NodeProps<Node<RefNodeProperties>>) {
 
   const sourceNodesData = useNodesData<Node>(sourceNodeIds);
 
-  // set data.value to sourceNode.data.value
+  // Group all source node values by their ref (ID)
   useMemo(() => {
-    updateNodeData(id, { value: sourceNodesData[0]?.data.value });
-  }, [sourceNodesData]);
+    const groupedValues: Record<string, any> = {};
+
+    sourceNodesData.forEach(node => {
+      if (node.data.ref) {
+        groupedValues[node.data.ref] = node.data.value;
+      }
+    });
+
+    updateNodeData(id, { value: groupedValues });
+  }, [sourceNodesData, updateNodeData, id]);
+
+  const connectedNodeCount = sourceNodeIds.length;
+  const valueCount = Object.keys(data.value || {}).length;
 
   return (
     <Resizable
@@ -56,19 +59,17 @@ function RefNode({ id, data, selected }: NodeProps<Node<RefNodeProperties>>) {
         isResizable: false,
         minWidth: defaultSize.width,
         minHeight: defaultSize.height,
-        handles: {
-          // source: null,
-          target: {
-            // position: Position.Bottom,
-            maxConnections: 1,
-          },
-        }
       }} >
       <div className="w-full h-full p-4 flex items-center space-x-2 flex-nowrap overflow-hidden">
-        <ArrowDownToDot className="h-4 w-4" />
-        <span className="text-sm text-gray-500 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
-          {data.ref ? data.ref : "No ID set"}
-        </span>
+        <Group className="h-4 w-4" />
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <span className="text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap">
+            {data.ref ? data.ref : "No ID set"}
+          </span>
+          <span className="text-xs text-gray-400">
+            {connectedNodeCount} nodes, {valueCount} values
+          </span>
+        </div>
         <Button
           size="icon"
           className="ml-auto"
@@ -80,18 +81,19 @@ function RefNode({ id, data, selected }: NodeProps<Node<RefNodeProperties>>) {
           <Copy className="h-4 w-4" />
         </Button>
       </div>
-    </Resizable >
+    </Resizable>
   );
 }
 
-
-export const definition: NodeDefinition<RefNodeProperties> = {
-  type: 'ref-node',
-  icon: ArrowDownToDot,
-  label: 'Reference Node',
+const definition: NodeDefinition<GrouperNodeProperties> = {
+  type: 'grouper-node',
+  icon: Group,
+  label: 'Grouper Node',
   properties,
-  component: memo(RefNode),
+  component: memo(GrouperNode),
   defaultSize,
   isResizable: true,
   isModifiable: true,
 };
+
+export default definition;

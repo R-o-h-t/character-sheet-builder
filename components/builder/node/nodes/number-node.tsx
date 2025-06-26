@@ -1,10 +1,10 @@
-import { memo } from "react";
-import { Resizable } from "./base/node-resizer";
-import { NodeProps, useReactFlow } from "@xyflow/react";
 import { Button } from "@/components/ui/button";
+import { NodeProps, useReactFlow } from "@xyflow/react";
 import { Hash, Minus, Plus } from "lucide-react";
-import { Node, NodeDefinition } from "../node-registry";
-import { BaseNodeProperties } from "./base/base-node-properties";
+import { memo } from "react";
+import { Node, NodeDefinition } from "../../node-registry";
+import { Resizable } from "../base/node-resizer";
+
 
 const numberNodeData = {
   value: {
@@ -95,3 +95,6 @@ export const definition: NodeDefinition<NumberNodeProperties> = {
   isResizable: true,
   isModifiable: true,
 };
+
+
+export default definition;

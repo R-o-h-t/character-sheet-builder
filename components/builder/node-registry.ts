@@ -1,14 +1,10 @@
-import { definition as TextNode } from './node/text-node';
-import { definition as NumberNode } from './node/number-node';
-import { definition as FormulaNode } from './node/formula/formula-node';
-import { definition as IdNode } from './node/id-node';
-import { definition as SelectNode } from './node/select-node';
+
+
 import { LucideIcon } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { BaseNodeProperties, baseProperties, generateBaseProperties, generateReadableId } from './node/base/base-node-properties';
 // Import others here
-
-export const nodeRegistry: NodeDefinition[] = [TextNode, NumberNode, FormulaNode, IdNode, SelectNode /*, ...other nodes */];
+import nodeRegistry from './node/nodes';
 
 // For React Flow nodeTypes:
 export const nodeTypes = Object.fromEntries(

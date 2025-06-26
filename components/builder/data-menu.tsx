@@ -49,33 +49,6 @@ export default function NodeDataMenu() {
   );
 }
 
-export function BasePropertiesEditor({ id }: { id: string }) {
-  const node = useNodesData<Node>(id);
-  const { updateNodeData } = useReactFlow<Node>();
-  const definition = baseProperties;
-
-  if (!node) {
-    return (
-      <div className="text-red-500">
-        Node not found or not selected.
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-gray-100 p-4 rounded-md overflow-auto">
-      <h3 className="text-lg font-semibold mb-2">Base Properties</h3>
-      <div className="flex flex-col gap-2">
-        {/* {Object.entries(definition).map(([key, prop]) => {
-
-
-        })} */}
-      </div>
-    </div>
-  );
-}
-
-
 export function NodeLinkedToView({ id }: { id: string }) {
   const node = useNodesData<Node>(id);
   const connections = useNodeConnections({ id });
@@ -105,7 +78,7 @@ export function NodeLinkedToView({ id }: { id: string }) {
                     {conn.type}
                   </span>
                   <span className="text-gray-600 italic mr-2">
-                    ({conn.data.value})
+                    ({toReadableValue(conn.data.value)})
                   </span>
                   <span className="text-blue-500 font-mono ml-2 cursor-pointer"
                     onClick={() => {
@@ -131,7 +104,7 @@ export function NodeLinkedToView({ id }: { id: string }) {
                     {conn.type}
                   </span>
                   <span className="text-gray-600 italic mr-2">
-                    ({conn.data.value})
+                    ({toReadableValue(conn.data.value)})
                   </span>
                   <span className="text-blue-500 font-mono ml-2"
                     onClick={() => {
@@ -536,4 +509,12 @@ export function NodeDataColorUpdater({
       </button>
     </div>
   );
+}
+
+
+export function toReadableValue(value: any): string {
+  if (typeof value === 'object' && value !== null) {
+    return "Object{" + Object.keys(value).length + " keys}";
+  }
+  return String(value);
 }

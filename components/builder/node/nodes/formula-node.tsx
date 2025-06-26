@@ -1,10 +1,10 @@
-import { NodeProps, useNodeConnections, useNodes, useNodesData, useReactFlow } from "@xyflow/react";
+import { NodeProps, useNodeConnections, useNodesData, useReactFlow } from "@xyflow/react";
+import assert from "assert";
 import { Radical } from "lucide-react";
 import * as math from 'mathjs';
 import { memo, useMemo } from "react";
-import { Node, NodeDefinition, nodeTypes } from '../../node-registry';
+import { Node, NodeDefinition } from '../../node-registry';
 import { Resizable } from "../base/node-resizer";
-import assert from "assert";
 
 const formulaNodeData = {
   formula: {
@@ -83,35 +83,53 @@ export const definition: NodeDefinition<FormulaNodeProperties> = {
 };
 
 
+export default definition;
+
 
 export const getResult = (formula: string, allNodes: Node["data"][], selfRef?: string): number | undefined => {
   try {
 
-    // Replace all node references (UPPER_CASE)
-    formula = formula.replace(/([A-Z_]+)/g, (match) => {
+    // Replace all node references (UPPER_CASE with optional dot notation)
+    formula = formula.replace(/([A-Z_]+(?:\.[A-Z_]+)*)/g, (match) => {
+      const parts = match.split('.');
+      const nodeRef = parts[0];
+
       if (selfRef) {
-        assert(match !== selfRef, "Cannot reference self in formula");
+        assert(nodeRef !== selfRef, "Cannot reference self in formula");
       }
-      const node = allNodes.find((n) => n.ref === match);
+
+      const node = allNodes.find((n) => n.ref === nodeRef);
       if (node) {
-        return node.value;
+        // Start with the node's value
+        let value = node.value;
+
+        // Navigate through the property chain
+        for (let i = 1; i < parts.length; i++) {
+          const property = parts[i];
+          if (value && typeof value === 'object' && property in value) {
+            value = value[property];
+          } else {
+            console.warn(`Property "${property}" not found in node "${nodeRef}" for formula "${formula}"`);
+            return match; // Return the original match if property not found
+          }
+        }
+
+        return value;
       }
       else {
-        console.warn(`Node reference "${match}" not found in formula "${formula}"`);
+        console.warn(`Node reference "${nodeRef}" not found in formula "${formula}"`);
       }
       return match;
     });
 
     // Evaluate the formula using mathjs
     const result = math.evaluate(formula);
-    console.log(`Evaluating formula: ${formula} = ${result}`);
 
     if (typeof result === 'number') {
       return result;
     }
   }
   catch (error) {
-    console.error(`Error evaluating formula "${formula}":`, error);
     return undefined;
   }
 }

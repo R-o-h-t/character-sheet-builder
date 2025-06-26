@@ -1,9 +1,6 @@
 import { useDnd } from "../../lib/context/dnd.context";
-import { nodeRegistry } from "./node-registry";
 import { Button } from '@/components/ui/button';
-
-
-
+import nodeRegistry from './node/nodes';
 
 export default function DndSidebar() {
 
