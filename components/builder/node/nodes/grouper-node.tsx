@@ -7,6 +7,16 @@ import { Node, NodeDefinition } from '../../node-registry';
 import { Resizable } from "../base/node-resizer";
 
 const properties = {
+  flatten: {
+    label: "Flatten Values",
+    type: "boolean" as const,
+    value: false,
+  },
+  ref: {
+    label: "Node ID",
+    type: "id" as const,
+    value: "",
+  },
 };
 
 type GrouperNodeProperties = typeof properties;
@@ -15,41 +25,28 @@ const defaultSize = { width: 180, height: 60 };
 
 function GrouperNode({ id, data, selected }: NodeProps<Node<GrouperNodeProperties>>) {
 
-  const { updateNodeData, getNode } = useReactFlow<Node>();
+  const { updateNodeData } = useReactFlow<Node>();
 
-  const connections = useNodeConnections({
-    handleType: 'target',
-  });
-
-  const sourceNodes = useMemo(() => {
-    return connections
-      .map(connection => getNode(connection.source))
-      .filter((node): node is Node => node !== undefined);
-  }, [connections, getNode]);
-
-  // Use useNodesData to only track specific source nodes
-  const sourceNodeIds = useMemo(() =>
-    sourceNodes.map(node => node.id),
-    [sourceNodes]
-  );
-
-  const sourceNodesData = useNodesData<Node>(sourceNodeIds);
 
   // Group all source node values by their ref (ID)
   useMemo(() => {
     const groupedValues: Record<string, any> = {};
 
-    sourceNodesData.forEach(node => {
-      if (node.data.ref) {
-        groupedValues[node.data.ref] = node.data.value;
+    Object.entries(data.entries).forEach(([key, node]) => {
+      const nodeValue = node.value;
+
+      if (data.flatten && typeof nodeValue === 'object' && nodeValue !== null && !Array.isArray(nodeValue)) {
+        // Flatten: merge child properties directly into groupedValues
+        Object.assign(groupedValues, nodeValue);
+      } else {
+        // Normal: use node ref as key
+        groupedValues[key] = nodeValue;
       }
     });
 
     updateNodeData(id, { value: groupedValues });
-  }, [sourceNodesData, updateNodeData, id]);
+  }, [data.entries, data.flatten, id, updateNodeData]);
 
-  const connectedNodeCount = sourceNodeIds.length;
-  const valueCount = Object.keys(data.value || {}).length;
 
   return (
     <Resizable
@@ -65,9 +62,6 @@ function GrouperNode({ id, data, selected }: NodeProps<Node<GrouperNodePropertie
         <div className="flex flex-col flex-1 overflow-hidden">
           <span className="text-sm text-gray-500 overflow-hidden text-ellipsis whitespace-nowrap">
             {data.ref ? data.ref : "No ID set"}
-          </span>
-          <span className="text-xs text-gray-400">
-            {connectedNodeCount} nodes, {valueCount} values
           </span>
         </div>
         <Button

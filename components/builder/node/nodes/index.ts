@@ -2,7 +2,8 @@ import TextNode from './text-node';
 import NumberNode from './number-node';
 import IdNode from './id-node';
 import GrouperNode from './grouper-node';
-import FormulaNode from './formula-node';
+import FormulaNode from './formula/formula-node';
+import SimpleFormula from './formula/simple/simple-formula-node';
 import SelectNode from './select-node';
 
 export default [
@@ -11,5 +12,6 @@ export default [
   IdNode,
   GrouperNode,
   FormulaNode,
+  SimpleFormula,
   SelectNode,
 ] as const;

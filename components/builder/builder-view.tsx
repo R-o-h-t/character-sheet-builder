@@ -7,15 +7,18 @@ import {
   Node,
   OnConnect,
   OnReconnect,
+  Panel,
   ReactFlow,
+  ReactFlowInstance,
   ReactFlowProvider,
+  SelectionMode,
   addEdge,
   reconnectEdge,
   useEdgesState,
   useNodesState,
   useReactFlow
 } from '@xyflow/react';
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 
 import { DndTypeProvider } from '@/lib/context/dnd.context';
 import '@xyflow/react/dist/style.css';
@@ -24,20 +27,23 @@ import DndSidebar from './sidebar';
 
 import { useDnd } from '@/lib/context/dnd.context';
 import NodeDataMenu from './data-menu';
+import { Button } from '@/components/ui/button';
+import { SelectionRect } from '@xyflow/react';
 
 
 const initNodes: Node[] = [];
 
 const initialEdges: Edge[] = [];
 
-
+const flowKey = 'dnd-flow';
 
 const DnDFlow = () => {
   const reactFlowWrapper = useRef(null);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [nodes, setNodes, onNodesChange] = useNodesState(initNodes);
+  const [rfInstance, setRfInstance] = useState<ReactFlowInstance<Node> | null>(null);
 
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, setViewport } = useReactFlow();
 
   const { type } = useDnd();
 
@@ -102,6 +108,32 @@ const DnDFlow = () => {
     edgeReconnectSuccessful.current = true;
   }, []);
 
+  const onSave = useCallback(() => {
+    if (rfInstance) {
+      const flow = rfInstance.toObject();
+      localStorage.setItem(flowKey, JSON.stringify(flow));
+    }
+  }, [rfInstance]);
+
+  const onRestore = useCallback(() => {
+    const restoreFlow = async () => {
+      const flowData = localStorage.getItem(flowKey);
+      if (!flowData) {
+        return;
+      }
+      const flow = JSON.parse(flowData);
+
+      if (flow) {
+        const { x = 0, y = 0, zoom = 1 } = flow.viewport;
+        setNodes(flow.nodes || []);
+        setEdges(flow.edges || []);
+        setViewport({ x, y, zoom });
+      }
+    };
+
+    restoreFlow();
+  }, [setNodes, setViewport]);
+
   return (
     <div className="relative h-full w-full">
       <div style={{ width: '100vw', height: '100vh' }} ref={reactFlowWrapper}>
@@ -117,13 +149,27 @@ const DnDFlow = () => {
           onDrop={onDrop}
           onDragStart={onDragStart}
           onDragOver={onDragOver}
+          onInit={setRfInstance}
           fitView
           nodeTypes={nodeTypes}
           snapToGrid
           snapGrid={[15, 15]}
           attributionPosition="top-right"
+          selectionMode={SelectionMode.Partial}
+
         >
           <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
+          <Panel position="top-right">
+            <div className="absolute top-4 right-90 space-x-2 flex">
+              <Button onClick={onSave}>
+                save
+              </Button>
+              <Button onClick={onRestore}>
+                restore
+              </Button>
+            </div>
+          </Panel>
+
         </ReactFlow>
       </div>
       <DndSidebar />

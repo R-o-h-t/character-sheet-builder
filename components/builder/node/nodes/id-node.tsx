@@ -10,7 +10,11 @@ import { Node, NodeDefinition } from '../../node-registry';
 import { Resizable } from "../base/node-resizer";
 
 const properties = {
-
+  ref: {
+    label: "Node ID",
+    type: "id" as const,
+    value: "",
+  },
 };
 
 type RefNodeProperties = typeof properties;

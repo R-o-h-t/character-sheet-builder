@@ -1,10 +1,10 @@
-import { NodeProps, useNodeConnections, useNodesData, useReactFlow } from "@xyflow/react";
+import { NodeProps, useReactFlow } from "@xyflow/react";
 import assert from "assert";
 import { Radical } from "lucide-react";
 import * as math from 'mathjs';
 import { memo, useMemo } from "react";
-import { Node, NodeDefinition } from '../../node-registry';
-import { Resizable } from "../base/node-resizer";
+import { Node, NodeDefinition } from '../../../node-registry';
+import { Resizable } from "../../base/node-resizer";
 
 const formulaNodeData = {
   formula: {
@@ -22,29 +22,11 @@ const defaultSize = { width: 160, height: 50 };
 
 function FormulaNode({ id, data, selected }: NodeProps<Node<FormulaNodeProperties, number | undefined>>) {
 
-  const { updateNodeData, getNode } = useReactFlow<Node>();
-
-  const connections = useNodeConnections({
-    handleType: 'target',
-  });
-
-  const sourceNodes = useMemo(() => {
-    return connections
-      .map(connection => getNode(connection.source))
-      .filter((node): node is Node => node !== undefined);
-  }, [connections, getNode]);
-
-  // Use useNodesData to only track specific source nodes
-  const sourceNodeIds = useMemo(() =>
-    sourceNodes.map(node => node.id),
-    [sourceNodes]
-  );
-
-  const sourceNodesData = useNodesData<Node>(sourceNodeIds);
+  const { updateNodeData } = useReactFlow<Node>();
 
   const result = useMemo(() => {
-    return getResult(data.formula, sourceNodesData.map(({ data }) => data), data.ref);
-  }, [data.formula, data.ref, sourceNodesData, sourceNodeIds, getNode]);
+    return getResult(data.formula, data.entries, data.ref);
+  }, [data.formula, data.ref, data.entries]);
 
   // Update node data with computed result
   useMemo(() => {
@@ -64,7 +46,7 @@ function FormulaNode({ id, data, selected }: NodeProps<Node<FormulaNodePropertie
       {/* display only the result */}
       <div className="w-full h-full p-4 flex items-center justify-center">
         <span className="text-lg font-mono">
-          {data.value !== undefined ? data.value.toString() : "_"}
+          {result !== undefined ? result.toFixed(2) : 'N/A'}
         </span>
       </div>
     </Resizable>
@@ -86,7 +68,7 @@ export const definition: NodeDefinition<FormulaNodeProperties> = {
 export default definition;
 
 
-export const getResult = (formula: string, allNodes: Node["data"][], selfRef?: string): number | undefined => {
+export const getResult = (formula: string, allNodes: Record<string, { value: any }>, selfRef?: string): number | undefined => {
   try {
 
     // Replace all node references (UPPER_CASE with optional dot notation)
@@ -98,7 +80,7 @@ export const getResult = (formula: string, allNodes: Node["data"][], selfRef?: s
         assert(nodeRef !== selfRef, "Cannot reference self in formula");
       }
 
-      const node = allNodes.find((n) => n.ref === nodeRef);
+      const node = allNodes[nodeRef];
       if (node) {
         // Start with the node's value
         let value = node.value;

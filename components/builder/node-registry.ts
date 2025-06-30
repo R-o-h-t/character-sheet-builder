@@ -2,7 +2,7 @@
 
 import { LucideIcon } from 'lucide-react';
 import { nanoid } from 'nanoid';
-import { BaseNodeProperties, baseProperties, generateBaseProperties, generateReadableId } from './node/base/base-node-properties';
+import { BaseNodeProperties, generateBaseProperties, generateReadableId } from './node/base/base-node-properties';
 // Import others here
 import nodeRegistry from './node/nodes';
 
@@ -46,6 +46,10 @@ export type NodeDataFromProperties<T extends NodeProperties, U = any> = {
   isResizable?: boolean;
   value?: U;
   ref: string;
+  entries: Record<string, {
+    handle?: string; // (optional) handle id
+    value: any; // value of the node
+  }>
 } & {
   [K in keyof T]: T[K]['value']
 } & {
@@ -89,6 +93,7 @@ export function addNode({
       ...defaultPropertiesValues,
       ...generateBaseProperties(),
       ref: generateReadableId(),
+      entries: {},
     },
     width: nodeDef.defaultSize?.width,
     height: nodeDef.defaultSize?.height,

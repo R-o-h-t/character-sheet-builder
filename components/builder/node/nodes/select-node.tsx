@@ -21,11 +21,17 @@ const properties = {
     type: "options" as const,
     value: [],
   },
-  explode: {
-    label: "Explode Options",
+  flatten: {
+    label: "Flatten Options",
     type: "boolean" as const,
     value: false,
   },
+  ref: {
+    label: "Node ID",
+    type: "id" as const,
+    value: "",
+  },
+
 };
 
 type SelectNodeProperties = typeof properties;
@@ -34,48 +40,25 @@ const defaultSize = { width: 160, height: 50 };
 
 function SelectNode({ id, data, selected }: NodeProps<Node<SelectNodeProperties>>) {
 
-  const { updateNodeData, getNode, getEdges, setEdges } = useReactFlow<Node>();
+  const { updateNodeData } = useReactFlow<Node>();
 
-  const connections = useNodeConnections({
-    handleType: 'target',
-  });
 
-  const sourceNodes = useMemo(() => {
-    return connections
-      .map(connection => getNode(connection.source))
-      .filter((node): node is Node => node !== undefined);
-  }, [connections, getNode]);
-
-  // Use useNodesData to only track specific source nodes
-  const sourceNodeIds = useMemo(() =>
-    sourceNodes.map(node => node.id),
-    [sourceNodes]
-  );
-
-  const sourceNodesData = useNodesData<Node>(sourceNodeIds);
 
   useMemo(() => {
-    // Update the options based on source nodes
     let options: string[];
 
-    if (data.explode) {
-      // Explode nested values
+    if (data.flatten) {
       options = [];
-      sourceNodesData.forEach(node => {
-        if (node.data.value && typeof node.data.value === 'object' && !Array.isArray(node.data.value)) {
-          // Add keys from nested object with parent ref prefix
-          const parentRef = node.data.ref || node.id;
-          options.push(...Object.keys(node.data.value).map(key => `${parentRef}.${key}`));
+      Object.entries(data.entries).forEach(([key, node]) => {
+        if (node.value && typeof node.value === 'object' && !Array.isArray(node.value)) {
+          // Add keys from nested object
+          options.push(...Object.keys(node.value));
         } else {
-          // Add the node ref if value is not an object
-          if (node.data.ref) {
-            options.push(node.data.ref);
-          }
+          options.push(key);
         }
       });
     } else {
-      // Use node refs as options (existing behavior)
-      options = sourceNodesData.map(node => node.data.ref).filter(value => value !== undefined);
+      options = Object.entries(data.entries).map(([key, node]) => key).filter(value => value !== undefined);
     }
 
     updateNodeData(id, { options });
@@ -83,59 +66,50 @@ function SelectNode({ id, data, selected }: NodeProps<Node<SelectNodeProperties>
       // Set the first option as default if no select is set or if the current select is not in options
       updateNodeData(id, { select: options[0] });
     }
-  }, [sourceNodesData, updateNodeData, id, data.explode]);
+  }, [updateNodeData, id, data.flatten, data.entries, data.select]);
 
   // set data.value to sourceNode.data.value or nested value
   useMemo(() => {
     let selectedValue;
 
-    if (data.explode) {
-      // Find the value from nested objects using group.subnode format
-      for (const node of sourceNodesData) {
-        if (node.data.value && typeof node.data.value === 'object' && !Array.isArray(node.data.value)) {
-          const parentRef = node.data.ref || node.id;
-          // Check if the selected option matches this node's format
-          if (data.select.startsWith(`${parentRef}.`)) {
-            const subKey = data.select.substring(`${parentRef}.`.length);
-            if (subKey in node.data.value) {
-              selectedValue = node.data.value[subKey];
-              break;
-            }
+    if (data.flatten) {
+      // Find the value from nested objects
+      for (const [key, node] of Object.entries(data.entries)) {
+        if (node.value && typeof node.value === 'object' && !Array.isArray(node.value)) {
+          if (data.select in node.value) {
+            selectedValue = node.value[data.select];
+            break;
           }
-        } else if (node.data.ref === data.select) {
-          selectedValue = node.data.value;
+        } else if (key === data.select) {
+          selectedValue = node.value;
           break;
         }
       }
     } else {
       // Existing behavior - find by ref
-      const selectedNode = sourceNodesData.find(node => node.data.ref === data.select);
-      selectedValue = selectedNode?.data.value;
+      const selectedNode = Object.entries(data.entries).find(([key, node]) => key === data.select);
+      selectedValue = selectedNode?.[1].value;
     }
 
     updateNodeData(id, { value: selectedValue });
-  }, [sourceNodesData, data.select, updateNodeData, id, data.explode]);
+  }, [updateNodeData, id, data.select, data.entries, data.flatten]);
 
   const selectedNodeId = useMemo(() => {
-    if (data.explode) {
-      // Find the node that contains the selected key using group.subnode format
-      const selectedNode = sourceNodesData.find(node => {
-        if (node.data.value && typeof node.data.value === 'object' && !Array.isArray(node.data.value)) {
-          const parentRef = node.data.ref || node.id;
-          if (data.select.startsWith(`${parentRef}.`)) {
-            const subKey = data.select.substring(`${parentRef}.`.length);
-            return subKey in node.data.value;
-          }
+    if (data.flatten) {
+      // Find the node that contains the selected key
+      const selectedNode = Object.entries(data.entries).find(([key, node]) => {
+        if (node.value && typeof node.value === 'object' && !Array.isArray(node.value)) {
+          return data.select in node.value;
         }
-        return node.data.ref === data.select;
+        return key === data.select;
       });
-      return selectedNode ? selectedNode.id : null;
+      return selectedNode ? selectedNode[0] : null;
     } else {
       // Existing behavior
-      const selectedNode = sourceNodesData.find(node => node.data.ref === data.select);
-      return selectedNode ? selectedNode.id : null;
+      const selectedNode = Object.entries(data.entries).find(([key, node]) => key === data.select);
+      return selectedNode ? selectedNode[0] : null;
     }
-  }, [sourceNodesData, data.select, data.explode]);
+  }, [data.entries, data.select, data.flatten]);
 
   return (
     <Resizable
@@ -146,7 +120,7 @@ function SelectNode({ id, data, selected }: NodeProps<Node<SelectNodeProperties>
         minWidth: defaultSize.width,
         minHeight: defaultSize.height,
         edges: {
-          highlightedConnectionsTo: sourceNodeIds.filter(nodeId => nodeId !== selectedNodeId),
+          highlightedConnectionsTo: Object.keys(data.entries).filter(nodeId => nodeId !== selectedNodeId),
           highlightedColor: '#ff007130',
         },
       }} >

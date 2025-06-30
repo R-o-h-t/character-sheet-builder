@@ -1,11 +1,10 @@
-import { Edge, OnSelectionChangeFunc, useNodeConnections, useNodesData, useOnSelectionChange, useReactFlow } from "@xyflow/react";
+import { Edge, OnSelectionChangeFunc, useNodesData, useOnSelectionChange, useReactFlow } from "@xyflow/react";
+import { Copy } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { getNodeDefinition, Node, NodeDefinition } from "./node-registry";
-import { baseProperties } from './node/base/base-node-properties';
-import { NodeDataFormulaUpdater } from "./node/formula/editor/formula-data-updater";
-import { Copy } from "lucide-react";
 import { Button } from "../ui/button";
+import { getNodeDefinition, Node, NodeDefinition } from "./node-registry";
+import { NodeDataFormulaUpdater } from "./node/formula/formula-data-updater";
 
 
 export default function NodeDataMenu() {
@@ -42,19 +41,16 @@ export default function NodeDataMenu() {
           <NodeInfoView key={`info-${selectedNodeId}`} id={selectedNodeId} />
           <NodeDataJsonView key={`json-${selectedNodeId}`} id={selectedNodeId} />
           <NodeDataUpdateForm key={`form-${selectedNodeId}`} id={selectedNodeId} />
-          <NodeLinkedToView key={`linked-${selectedNodeId}`} id={selectedNodeId} />
+          <NodeEntriesView key={`entries-${selectedNodeId}`} id={selectedNodeId} />
         </>
       )}
     </aside>
   );
 }
 
-export function NodeLinkedToView({ id }: { id: string }) {
+export function NodeEntriesView({ id }: { id: string }) {
   const node = useNodesData<Node>(id);
-  const connections = useNodeConnections({ id });
-  // each connection have a 'source' and 'target' property (take the one that is not the current node != id)
-  const targetConnections = useNodesData<Node>(connections.filter((conn) => conn.target === id).map((conn) => conn.source));
-  const sourceConnections = useNodesData<Node>(connections.filter((conn) => conn.source === id).map((conn) => conn.target));
+
 
   if (!node) {
     return (
@@ -68,60 +64,40 @@ export function NodeLinkedToView({ id }: { id: string }) {
     <div className="bg-gray-100 p-4 rounded-md overflow-auto">
       <h3 className="text-lg font-semibold mb-2">Linked Nodes</h3>
       <div className="flex flex-col gap-2">
-        {targetConnections.length > 0 && (
+        {Object.keys(node.data.entries).length > 0 && (
           <div>
             <h4 className="font-semibold">Linked From:</h4>
             <ul className="list-disc pl-5">
-              {targetConnections.map((conn) => (
-                <li key={conn.id} className="flex items-center gap-2 space-x-2">
-                  <span className="font-medium mr-2">
-                    {conn.type}
-                  </span>
-                  <span className="text-gray-600 italic mr-2">
-                    ({toReadableValue(conn.data.value)})
-                  </span>
+              {Object.entries(node.data.entries).map(([key, entry]) => (
+                <li key={key} className="flex items-center gap-2 space-x-2">
+                  {/* Node Ref */}
                   <span className="text-blue-500 font-mono ml-2 cursor-pointer"
                     onClick={() => {
                       // copy the id to clipboard
-                      navigator.clipboard.writeText(conn.data.ref);
+                      navigator.clipboard.writeText(key);
                       toast.success("Node ID copied to clipboard");
                     }}
                   >
-                    {conn.data.ref}
+                    {key}
+                  </span>
+                  {/* handle */}
+                  {entry.handle && (
+                    <span className="text-sm text-gray-500">
+                      (Handle: {entry.handle})
+                    </span>
+                  )}
+                  {/* value */}
+                  <span className="text-sm text-gray-500">
+                    {
+                      typeof entry.value === 'object' && entry.value !== null
+                        ? `Object{${Object.keys(entry.value).length} keys}`
+                        : `Value: ${entry.value}`
+                    }
                   </span>
                 </li>
               ))}
             </ul>
           </div>
-        )}
-        {sourceConnections.length > 0 && (
-          <div>
-            <h4 className="font-semibold">Linked To:</h4>
-            <ul className="list-disc pl-5">
-              {sourceConnections.map((conn) => (
-                <li key={conn.id} className="flex items-center gap-2 space-x-2">
-                  <span className="font-medium mr-2">
-                    {conn.type}
-                  </span>
-                  <span className="text-gray-600 italic mr-2">
-                    ({toReadableValue(conn.data.value)})
-                  </span>
-                  <span className="text-blue-500 font-mono ml-2"
-                    onClick={() => {
-                      // copy the id to clipboard
-                      navigator.clipboard.writeText(conn.id);
-                      toast.success("Node ID copied to clipboard");
-                    }}
-                  >
-                    {conn.id}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {targetConnections.length === 0 && sourceConnections.length === 0 && (
-          <p>No linked nodes found.</p>
         )}
       </div>
     </div >
