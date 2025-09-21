@@ -1,6 +1,6 @@
 import { NodeProps, Position, useReactFlow } from '@xyflow/react';
 import { Blocks } from 'lucide-react';
-import { memo, useEffect, useMemo } from 'react';
+import { memo, useEffect, useMemo, useRef } from 'react';
 
 import type { CompositeIO } from '@/lib/composite/graph';
 import { Node, NodeDefinition } from '../../node-registry';
@@ -85,14 +85,26 @@ function CompositeNode({ id, data, selected }: NodeProps<Node<CompositeNodePrope
     return { outputs: result, inputs, outputsMeta: outputs };
   }, [data.entries, inputs, outputs]);
 
+  // Create a stable key for comparison based on the resolved content
+  const resolvedKey = useMemo(() => {
+    if ('error' in resolved) {
+      return `error:${resolved.error}`;
+    }
 
-  const needUpdate = React
+    const outputKeys = Object.keys(resolved.outputs).sort();
+    const outputValues = outputKeys.map(key => `${key}:${JSON.stringify(resolved.outputs[key])}`).join('|');
+    return `success:${outputValues}:inputs:${resolved.inputs.length}:outputs:${resolved.outputsMeta.length}`;
+  }, [resolved]);
+
+  // Track the last update key to prevent infinite loops
+  const lastUpdateKeyRef = useRef<string>('');
 
   useEffect(() => {
-    if (data.value !== resolved) {
+    if (lastUpdateKeyRef.current !== resolvedKey) {
+      lastUpdateKeyRef.current = resolvedKey;
       updateNodeData(id, { value: resolved });
     }
-  }, [id, resolved, updateNodeData]);
+  }, [id, resolved, resolvedKey, updateNodeData]);
 
   const hasHandles = inputHandles.length > 0 || outputHandles.length > 0;
 

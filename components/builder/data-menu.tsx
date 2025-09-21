@@ -139,7 +139,7 @@ export function NodeDataJsonView({ id }: { id: string }) {
   }
 
   return (
-    <div className="bg-gray-100 p-4 rounded-md overflow-auto">
+    <div className="bg-gray-100 p-4 rounded-md overflow-auto max-h-60">
       <h3 className="text-lg font-semibold mb-2">Node Data JSON</h3>
       <pre className="whitespace-pre-wrap break-words">
         {JSON.stringify(node.data, null, 2)}

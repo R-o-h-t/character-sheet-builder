@@ -9,7 +9,7 @@ import nodeRegistry from './node/nodes';
 // For React Flow nodeTypes - wrap each component with error boundary:
 export const nodeTypes = Object.fromEntries(
   nodeRegistry.map((n) => [
-    n.type, 
+    n.type,
     withNodeErrorBoundary(n.component, n.label)
   ])
 );

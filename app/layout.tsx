@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { LayoutMenu } from "@/components/layout/layout-menu";
 import { ProjectManagerProvider } from "@/lib/context/project-manager.context";
 import { AppErrorBoundary } from "@/components/error-boundary/error-boundary";
+import { GlobalErrorMonitor } from "@/components/error-boundary/global-error-monitor";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -45,6 +46,7 @@ export default function RootLayout({
                   {children}
                 </div>
                 <Toaster />
+                <GlobalErrorMonitor />
               </ProjectManagerProvider>
             </ThemeProvider>
           </AppErrorBoundary>

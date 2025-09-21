@@ -11,8 +11,8 @@ export function withNodeErrorBoundary<T extends Node = Node>(
 ) {
   const ComponentWithErrorBoundary = (props: NodeProps<T>) => {
     return (
-      <NodeErrorBoundary 
-        nodeId={props.id} 
+      <NodeErrorBoundary
+        nodeId={props.id}
         nodeType={displayName || WrappedComponent.displayName || WrappedComponent.name || 'Node'}
       >
         <WrappedComponent {...props} />

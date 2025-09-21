@@ -32,17 +32,17 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('Error caught by boundary:', error, errorInfo);
-    
+
     // Report error to error tracking system
     errorReporter.report(this.props.level || 'app', error, {
       nodeId: this.props.identifier,
       nodeType: this.props.level === 'node' ? this.props.identifier : undefined,
       componentStack: errorInfo.componentStack || undefined,
     });
-    
+
     // Call optional error handler
     this.props.onError?.(error, errorInfo);
-    
+
     this.setState({
       error,
       errorInfo,
@@ -78,9 +78,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                   {this.props.identifier}
                 </p>
               )}
-              <Button 
-                size="sm" 
-                variant="outline" 
+              <Button
+                size="sm"
+                variant="outline"
                 onClick={this.handleRetry}
                 className="text-xs"
               >
@@ -117,9 +117,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                         <RefreshCw className="h-4 w-4 mr-2" />
                         Retry
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        onClick={this.handleGoHome} 
+                      <Button
+                        variant="outline"
+                        onClick={this.handleGoHome}
                         size="sm"
                       >
                         <Home className="h-4 w-4 mr-2" />
@@ -163,8 +163,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                         <RefreshCw className="h-4 w-4 mr-2" />
                         Try Again
                       </Button>
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         onClick={this.handleGoHome}
                       >
                         <Home className="h-4 w-4 mr-2" />
@@ -194,14 +194,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 }
 
 // Convenience wrapper for node-level error boundaries
-export function NodeErrorBoundary({ 
-  children, 
-  nodeId, 
-  nodeType 
-}: { 
-  children: ReactNode; 
-  nodeId?: string; 
-  nodeType?: string; 
+export function NodeErrorBoundary({
+  children,
+  nodeId,
+  nodeType
+}: {
+  children: ReactNode;
+  nodeId?: string;
+  nodeType?: string;
 }) {
   return (
     <ErrorBoundary

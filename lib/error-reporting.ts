@@ -40,7 +40,7 @@ class ErrorReporter {
     };
 
     this.errors.unshift(report);
-    
+
     // Keep only the last maxErrors
     if (this.errors.length > this.maxErrors) {
       this.errors = this.errors.slice(0, this.maxErrors);

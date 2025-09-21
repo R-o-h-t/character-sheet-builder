@@ -29,7 +29,6 @@ import { useProjectManager } from '@/lib/context/project-manager.context';
 import { deriveCompositeInputs, deriveCompositeOutputs } from '@/lib/composite/graph';
 import type { ProjectData } from '@/lib/projects/types';
 import { GraphErrorBoundary } from '../error-boundary/error-boundary';
-import { ErrorMonitor } from '../error-boundary/error-monitor';
 import { nodeTypes, type Node, addNode } from './node-registry';
 import { FlowCanvas } from './flow-canvas';
 import nodeDefinitions from './node/nodes';
@@ -53,7 +52,6 @@ function BuilderCanvas({ projectId, isPreviewMode = false }: BuilderCanvasProps)
   const [editingCompositeNodeId, setEditingCompositeNodeId] = useState<string | null>(null);
   const [currentProject, setCurrentProject] = useState<ProjectData | null>(null);
   const [projectLoading, setProjectLoading] = useState(false);
-  const [showErrorMonitor, setShowErrorMonitor] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -255,15 +253,6 @@ function BuilderCanvas({ projectId, isPreviewMode = false }: BuilderCanvasProps)
                 <Button variant="outline" size="sm" onClick={onRestore}>
                   Restore
                 </Button>
-                {process.env.NODE_ENV === 'development' && (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => setShowErrorMonitor(!showErrorMonitor)}
-                  >
-                    {showErrorMonitor ? 'Hide' : 'Show'} Errors
-                  </Button>
-                )}
               </>
             )}
           </Panel>
@@ -574,11 +563,6 @@ function InternalWorkspace({
           </button>
         </div>
       )}
-      
-      <ErrorMonitor 
-        isVisible={showErrorMonitor} 
-        onClose={() => setShowErrorMonitor(false)} 
-      />
     </div>
   );
 }

@@ -10,7 +10,7 @@ import {
   CardDescription,
   CardContent,
 } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@/components/ui/badge-new';
 import { errorReporter, type ErrorReport } from '@/lib/error-reporting';
 
 interface ErrorMonitorProps {
@@ -94,7 +94,7 @@ export function ErrorMonitor({ isVisible = false, onClose }: ErrorMonitorProps) 
             </div>
           </div>
         </CardHeader>
-        
+
         <CardContent className="flex-1 overflow-hidden flex flex-col">
           {/* Stats */}
           <div className="grid grid-cols-5 gap-4 mb-4">
@@ -148,11 +148,11 @@ export function ErrorMonitor({ isVisible = false, onClose }: ErrorMonitorProps) 
                       {new Date(error.timestamp).toLocaleTimeString()}
                     </span>
                   </div>
-                  
+
                   <div className="text-sm text-muted-foreground">
                     {error.error.message}
                   </div>
-                  
+
                   {process.env.NODE_ENV === 'development' && error.error.stack && (
                     <details className="text-xs">
                       <summary className="cursor-pointer text-muted-foreground">
