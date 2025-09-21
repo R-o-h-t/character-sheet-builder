@@ -17,6 +17,21 @@ export type CompositeGraph = {
   outputs: CompositeIO[];
 };
 
+/**
+ * A lightweight specification describing how to compute a specific output
+ * of a composite from its inputs. We avoid serializing executable code and
+ * instead use a declarative type that the runtime understands.
+ *
+ * Currently supported:
+ * - type "composite-sim": compute by simulating the saved internal graph
+ *   and returning the value for the given handleId.
+ */
+export type OutputHandlerSpec = {
+  handleId: string;
+  type: 'composite-sim';
+  version: 1;
+};
+
 export function deriveCompositeInputs(nodes: FlowNode[]): CompositeIO[] {
   return nodes
     .filter((node) => node.type === 'internal-input')
@@ -70,6 +85,15 @@ export function deriveCompositeOutputs(nodes: FlowNode[], edges: Edge[]): Compos
         source,
       };
     });
+}
+
+/**
+ * Generate default per-output handler specs for a composite's outputs.
+ * These handlers tell the runtime to compute outputs by simulating the
+ * internal graph and reading the value for each handle.
+ */
+export function generateOutputHandlers(outputs: CompositeIO[]): OutputHandlerSpec[] {
+  return outputs.map((o) => ({ handleId: o.handleId, type: 'composite-sim', version: 1 as const }));
 }
 
 export function normalizeHandleId(

@@ -20,6 +20,7 @@ import PropertyNode from './internal/property-node';
 import ReferenceNode from './internal/reference-node';
 import CompositeNode from './composite-node';
 import OutputNode from './internal/output-node';
+import ObjectDecomposeNode from './object-decompose-node';
 
 export default [
   // Brick components - foundational building blocks
@@ -39,6 +40,7 @@ export default [
   OutputNode,
   CompositeNode,
   ObjectNode,
+  ObjectDecomposeNode,
 
   // Basic nodes
   TextNode,

@@ -2,7 +2,7 @@ import { NodeProps, Position, useReactFlow } from '@xyflow/react';
 import { Blocks, TestTube } from 'lucide-react';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { CompositeIO } from '@/lib/composite/graph';
+import type { CompositeIO, OutputHandlerSpec } from '@/lib/composite/graph';
 import { deriveCompositeInputs, deriveCompositeOutputs } from '@/lib/composite/graph';
 import { simulateInternalGraph, SimulatedNode } from '@/lib/composite/simulation';
 import { Node, NodeDefinition } from '../../node-registry';
@@ -135,14 +135,31 @@ function CompositeNode({ id, data, selected }: NodeProps<Node<CompositeNodePrope
     }
 
     try {
-      // Simulate the internal graph execution
+      const handlers = (((data as any).outputHandlers as OutputHandlerSpec[]) || []).filter(Boolean);
+
+      // Simulate internal graph once (efficient even if multiple outputs)
       const simulatedOutputs = simulateInternalGraph(internalNodes, internalEdges, externalInputs);
 
-      // Map simulated outputs to the expected output format
       const result: Record<string, unknown> = {};
-      for (const output of effectiveOutputs) {
-        const key = output.handleId;
-        result[key] = simulatedOutputs[key] ?? null;
+
+      if (handlers.length > 0) {
+        // Use handler list as truth for which outputs to compute/persist
+        for (const h of handlers) {
+          const key = h.handleId;
+          result[key] = simulatedOutputs[key] ?? null;
+        }
+        // Ensure any declared outputs also appear (for UI alignment)
+        for (const io of effectiveOutputs) {
+          if (!(io.handleId in result)) {
+            result[io.handleId] = simulatedOutputs[io.handleId] ?? null;
+          }
+        }
+      } else {
+        // Fallback to declared outputs
+        for (const io of effectiveOutputs) {
+          const key = io.handleId;
+          result[key] = simulatedOutputs[key] ?? null;
+        }
       }
 
       return { outputs: result, inputs: effectiveInputs, outputsMeta: effectiveOutputs };

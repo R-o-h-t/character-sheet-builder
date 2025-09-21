@@ -26,7 +26,7 @@ import { Button } from '@/components/ui/button';
 import Topbar from './topbar';
 import { DndTypeProvider, useDnd } from '@/lib/context/dnd.context';
 import { useProjectManager } from '@/lib/context/project-manager.context';
-import { deriveCompositeInputs, deriveCompositeOutputs, CompositeIO } from '@/lib/composite/graph';
+import { deriveCompositeInputs, deriveCompositeOutputs, CompositeIO, generateOutputHandlers } from '@/lib/composite/graph';
 import type { ProjectData } from '@/lib/projects/types';
 import { GraphErrorBoundary } from '../error-boundary/error-boundary';
 import { nodeTypes, type Node, addNode } from './node-registry';
@@ -402,12 +402,14 @@ function CompositeEditorModal({ nodeId, onClose }: { nodeId: string; onClose: ()
   const handleSave = useCallback(() => {
     const inputs = deriveCompositeInputs(draftNodes);
     const outputs = deriveCompositeOutputs(draftNodes, draftEdges);
+    const outputHandlers = generateOutputHandlers(outputs);
 
     updateNodeData(nodeId, {
       internalNodes: cloneNodes(draftNodes),
       internalEdges: cloneEdges(draftEdges),
       inputs,
       outputs,
+      outputHandlers,
     });
     onClose();
   }, [draftEdges, draftNodes, nodeId, onClose, updateNodeData]);
@@ -446,11 +448,13 @@ function CompositeEditorModal({ nodeId, onClose }: { nodeId: string; onClose: ()
             // Save, enable testing on node, and close to allow testing in canvas
             const inputs = deriveCompositeInputs(draftNodes);
             const outputs = deriveCompositeOutputs(draftNodes, draftEdges);
+            const outputHandlers = generateOutputHandlers(outputs);
             updateNodeData(nodeId, {
               internalNodes: cloneNodes(draftNodes),
               internalEdges: cloneEdges(draftEdges),
               inputs,
               outputs,
+              outputHandlers,
               enableTesting: true,
             });
             onClose();

@@ -8,6 +8,7 @@ export interface ExportableNode {
   internalEdges?: any[];
   inputs?: any[];
   outputs?: any[];
+  outputHandlers?: any[];
   testInputs?: string;
   testOutputs?: string;
   enableTesting?: boolean;
@@ -28,6 +29,7 @@ export function exportNodeForCLI(node: Node): ExportableNode {
     internalEdges: nodeData.internalEdges || [],
     inputs: nodeData.inputs || [],
     outputs: nodeData.outputs || [],
+    outputHandlers: nodeData.outputHandlers || [],
     testInputs: nodeData.testInputs || '{}',
     testOutputs: nodeData.testOutputs || '{}',
     enableTesting: nodeData.enableTesting || false,

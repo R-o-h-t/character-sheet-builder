@@ -158,8 +158,24 @@ export function Resizable({
 
   // Build a signature that changes when any source node updates its value
   const sourcesSignature = useMemo(() => {
+    const safeSig = (val: unknown) => {
+      try {
+        // Keep signature short-ish to avoid large dependency strings
+        const str = JSON.stringify(val);
+        return str && str.length > 512 ? str.slice(0, 512) : str;
+      } catch {
+        return String(val);
+      }
+    };
+
     return sourceNodesData
-      .map((n) => `${n.id}:${(n.data as any)?._valueTick ?? 0}:${(n.data as any)?._entriesTick ?? 0}`)
+      .map((n) => {
+        const vTick = (n.data as any)?._valueTick ?? 0;
+        const eTick = (n.data as any)?._entriesTick ?? 0;
+        const vSig = safeSig((n.data as any)?.value);
+        const hvSig = safeSig((n.data as any)?.handleValues);
+        return `${n.id}:${vTick}:${eTick}:${vSig}:${hvSig}`;
+      })
       .join('|');
   }, [sourceNodesData]);
 

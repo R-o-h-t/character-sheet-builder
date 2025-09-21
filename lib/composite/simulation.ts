@@ -148,17 +148,25 @@ function simulateNodeExecution(node: SimulatedNode): any {
     case 'brick-value':
       return data.value || 0;
 
-    case 'composite-node': {
-      // Support nested composite nodes by simulating their internal graphs
-      const nestedInputsDef = (data as any).inputs as Array<{ handleId: string }> | undefined;
-      const nestedNodes = (data as any).internalNodes as SimulatedNode[] | undefined;
-      const nestedEdges = (data as any).internalEdges as Edge[] | undefined;
-      if (!nestedNodes || !nestedNodes.length) {
+    case 'composite-node':
+    // fallthrough to generic composite handling
+    // eslint-disable-next-line no-fallthrough
+    default: {
+      // Generic composite handling: if a node (of any type) carries an internal graph,
+      // treat it as a composite and simulate it. This supports specialized composites
+      // like "composite-plus", "composite-multiply", etc., not just "composite-node".
+      const nestedNodes = (data as any)?.internalNodes as SimulatedNode[] | undefined;
+      const nestedEdges = (data as any)?.internalEdges as Edge[] | undefined;
+
+      if (!Array.isArray(nestedNodes) || nestedNodes.length === 0) {
+        // Not a composite; just return current value
         return data.value;
       }
+
       // Build external inputs for the nested composite from current entries
+      const nestedInputsDef = (data as any)?.inputs as Array<{ handleId: string }> | undefined;
       const nestedExternalInputs: Record<string, any> = {};
-      if (nestedInputsDef && Array.isArray(nestedInputsDef)) {
+      if (Array.isArray(nestedInputsDef)) {
         for (const io of nestedInputsDef) {
           const key = io.handleId;
           const entry = data.entries?.[key];
@@ -167,7 +175,7 @@ function simulateNodeExecution(node: SimulatedNode): any {
       } else {
         // Fallback: use all entries as inputs
         for (const [key, entry] of Object.entries(data.entries || {})) {
-          nestedExternalInputs[key] = entry.value;
+          nestedExternalInputs[key] = (entry as any).value;
         }
       }
 
@@ -184,9 +192,7 @@ function simulateNodeExecution(node: SimulatedNode): any {
       return nestedOutputs;
     }
 
-    default:
-      // For unknown node types, just return the current value
-      return data.value;
+    // default handled in generic composite branch above
   }
 }
 
