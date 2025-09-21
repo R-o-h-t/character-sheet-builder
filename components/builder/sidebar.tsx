@@ -15,7 +15,7 @@ export default function DndSidebar() {
     <ErrorBoundary
       level="app"
       fallback={
-        <aside className="bg-card opacity-80 border-2 p-4 w-64 h-full absolute top-0 left-0 flex flex-col gap-2">
+        <aside className="bg-card opacity-80 border-2 p-4 w-64 h-full absolute top-0 left-0 flex flex-col gap-2 z-[9999]">
           <h2 className="text-lg font-semibold mb-4">Nodes</h2>
           <div className="text-sm text-muted-foreground">
             Error loading sidebar
@@ -23,11 +23,10 @@ export default function DndSidebar() {
         </aside>
       }
     >
-      <aside className="bg-card opacity-80 border-2 p-4 w-64 h-full absolute top-0 left-0 flex flex-col gap-2">
+      <aside className="bg-card opacity-80 border-2 p-4 w-64 h-full absolute top-0 left-0 flex flex-col gap-2 z-[9999]">
         <h2 className="text-lg font-semibold mb-4">Nodes</h2>
 
         {nodeRegistry
-          .filter((node) => node.category !== 'Internal')
           .map((node) => (
             <ErrorBoundary
               key={node.type}

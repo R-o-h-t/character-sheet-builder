@@ -39,14 +39,14 @@ export default function NodeDataMenu() {
     <ErrorBoundary
       level="app"
       fallback={
-        <aside className="bg-card opacity-80 border-2 p-4 w-84 h-full absolute top-0 right-0 flex flex-col gap-2">
+        <aside className="bg-card opacity-80 border-2 p-4 w-84 h-full absolute top-14 right-0 flex flex-col gap-2">
           <div className="text-sm text-muted-foreground">
             Error loading data menu
           </div>
         </aside>
       }
     >
-      <aside className="bg-card opacity-80 border-2 p-4 w-84 h-full absolute top-0 right-0 flex flex-col gap-2">
+      <aside className="bg-card opacity-80 border-2 p-4 w-84 h-full absolute top-14 right-0 flex flex-col gap-2">
         {selectedNodeId && (
           <>
             <ErrorBoundary level="node" fallback={<div className="text-xs text-red-500">Error loading node info</div>}>

@@ -4,26 +4,21 @@ import { NodeProps, Position, useReactFlow } from '@xyflow/react';
 
 import { Node, NodeDefinition } from '../../../node-registry';
 import { Resizable } from '../../base/node-resizer';
-import { ConnectionField } from '../../base/connection-field';
-import { createError, getEntryByHandle, resolveNumber, toNumber } from '../../utils/value';
+import { ConnectionInput, ConnectionOutput } from '../../base/connection-io';
+import {
+  getInputConnection,
+  resolveNumberInput,
+  isErrorValue
+} from '../../utils/connection-system';
 
-const properties = {
-  numerator: {
-    label: 'Numerator',
-    type: 'number' as const,
-    value: '0',
-  },
-  denominator: {
-    label: 'Denominator',
-    type: 'number' as const,
-    value: '1',
-  },
-};
+// Remove properties - data comes only from connections
+const properties = {};
 
 type DivideNodeProperties = typeof properties;
 
 const HANDLE_NUMERATOR = 'numerator';
 const HANDLE_DENOMINATOR = 'denominator';
+const HANDLE_OUTPUT = 'result';
 
 function DivideNode({ id, data, selected }: NodeProps<Node<DivideNodeProperties, number>>) {
   const { updateNodeData } = useReactFlow<Node>();

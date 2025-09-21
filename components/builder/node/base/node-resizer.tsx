@@ -156,6 +156,13 @@ export function Resizable({
 
   const sourceNodesData = useNodesData<Node>(sourceNodeIds);
 
+  // Build a signature that changes when any source node updates its value
+  const sourcesSignature = useMemo(() => {
+    return sourceNodesData
+      .map((n) => `${n.id}:${(n.data as any)?._valueTick ?? 0}:${(n.data as any)?._entriesTick ?? 0}`)
+      .join('|');
+  }, [sourceNodesData]);
+
   // set the node data.entries to the source nodes data.value
   useEffect(() => {
     const lookup = new Map(sourceNodesData.map((node) => [node.id, node]));
@@ -194,8 +201,10 @@ export function Resizable({
       };
     });
 
-    updateNodeData(id, { entries });
-  }, [connections, id, sourceNodesData, updateNodeData]);
+    // Include a monotonic tick to signal downstream nodes that entries changed,
+    // ensuring memoized computations can re-run even if shapes are similar.
+    updateNodeData(id, { entries, _entriesTick: Date.now() });
+  }, [connections, id, sourceNodesData, sourcesSignature, updateNodeData]);
 
 
   const isHighlighted = useCallback((edge: Edge) => {
@@ -324,6 +333,18 @@ function getHandleSpecificValue(data: Node['data'], handleId?: string) {
   const handleValues = (data as unknown as { handleValues?: Record<string, unknown> }).handleValues;
   if (handleId && handleValues && handleId in handleValues) {
     return handleValues[handleId];
+  }
+  // Fallbacks for composite nodes with multiple outputs where value may be an object
+  const val: any = (data as any).value;
+  if (handleId && val && typeof val === 'object') {
+    // Case 1: composite set value to the resolved object: { outputs: { handleId: value }, ... }
+    if (val.outputs && typeof val.outputs === 'object' && handleId in val.outputs) {
+      return val.outputs[handleId];
+    }
+    // Case 2: value itself is a simple map of handleId -> value
+    if (handleId in val) {
+      return val[handleId];
+    }
   }
   return data.value;
 }

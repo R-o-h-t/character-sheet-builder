@@ -1,0 +1,117 @@
+{
+  "id": "example-divide-node",
+  "type": "composite-node",
+  "name": "Divide Calculator",
+  "internalNodes": [
+    {
+      "id": "input_a_node",
+      "type": "internal-input",
+      "position": {
+        "x": 50,
+        "y": 50
+      },
+      "data": {
+        "handleId": "input_a",
+        "label": "A",
+        "ref": "ref_input_a",
+        "entries": {}
+      }
+    },
+    {
+      "id": "input_b_node",
+      "type": "internal-input",
+      "position": {
+        "x": 50,
+        "y": 120
+      },
+      "data": {
+        "handleId": "input_b",
+        "label": "B",
+        "ref": "ref_input_b",
+        "entries": {}
+      }
+    },
+    {
+      "id": "formula_node",
+      "type": "brick-formula",
+      "position": {
+        "x": 200,
+        "y": 85
+      },
+      "data": {
+        "expression": "A / B",
+        "ref": "ref_formula",
+        "entries": {}
+      }
+    },
+    {
+      "id": "output_node",
+      "type": "internal-output",
+      "position": {
+        "x": 350,
+        "y": 85
+      },
+      "data": {
+        "handleId": "result",
+        "label": "Quotient",
+        "ref": "ref_output",
+        "entries": {}
+      }
+    }
+  ],
+  "internalEdges": [
+    {
+      "id": "edge_a",
+      "source": "input_a_node",
+      "target": "formula_node",
+      "sourceHandle": "source",
+      "targetHandle": "A"
+    },
+    {
+      "id": "edge_b",
+      "source": "input_b_node",
+      "target": "formula_node",
+      "sourceHandle": "source",
+      "targetHandle": "B"
+    },
+    {
+      "id": "edge_result",
+      "source": "formula_node",
+      "target": "output_node",
+      "sourceHandle": "source",
+      "targetHandle": "target"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "input_a",
+      "label": "A",
+      "handleId": "input_a"
+    },
+    {
+      "id": "input_b",
+      "label": "B",
+      "handleId": "input_b"
+    }
+  ],
+  "outputs": [
+    {
+      "id": "result",
+      "label": "Quotient",
+      "handleId": "result",
+      "source": {
+        "nodeId": "formula_node",
+        "handleId": "result"
+      }
+    }
+  ],
+  "testInputs": "{\"input_a\": 21, \"input_b\": 3}",
+  "testOutputs": "{\"result\": 7}",
+  "enableTesting": true,
+  "data": {
+    "name": "Divide Calculator",
+    "testInputs": "{\"input_a\": 21, \"input_b\": 3}",
+    "testOutputs": "{\"result\": 7}",
+    "enableTesting": true
+  }
+}

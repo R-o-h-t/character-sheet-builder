@@ -49,7 +49,7 @@ function InputNode({ id, data, selected }: NodeProps<Node<InputNodeProperties, u
   const firstValue = useMemo(() => {
     const entries = Object.values(data.entries ?? {});
     if (!entries.length) {
-      return null;
+      return data.value ?? null;
     }
 
     const entry = entries[0];
@@ -58,7 +58,7 @@ function InputNode({ id, data, selected }: NodeProps<Node<InputNodeProperties, u
     }
 
     return entry.value;
-  }, [data.entries]);
+  }, [data.entries, data.value]);
 
   useEffect(() => {
     updateNodeData(id, { value: firstValue });

@@ -5,7 +5,6 @@ import {
   BackgroundVariant,
   Edge,
   Node as FlowNode,
-  Panel,
   type NodeTypes,
   ReactFlowInstance,
   ReactFlowProvider,
@@ -24,9 +23,10 @@ import React, {
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import Topbar from './topbar';
 import { DndTypeProvider, useDnd } from '@/lib/context/dnd.context';
 import { useProjectManager } from '@/lib/context/project-manager.context';
-import { deriveCompositeInputs, deriveCompositeOutputs } from '@/lib/composite/graph';
+import { deriveCompositeInputs, deriveCompositeOutputs, CompositeIO } from '@/lib/composite/graph';
 import type { ProjectData } from '@/lib/projects/types';
 import { GraphErrorBoundary } from '../error-boundary/error-boundary';
 import { nodeTypes, type Node, addNode } from './node-registry';
@@ -34,6 +34,9 @@ import { FlowCanvas } from './flow-canvas';
 import nodeDefinitions from './node/nodes';
 import NodeDataMenu from './data-menu';
 import DndSidebar from './sidebar';
+import { downloadNodeAsJSON, downloadTestParametersTemplate } from '@/lib/cli-export';
+import { CompositeTestingPanel } from '@/components/testing/composite-testing-panel';
+import type { CompositeTestSuite } from '@/lib/testing/composite-test-types';
 
 const flowKey = 'dnd-flow';
 
@@ -52,6 +55,9 @@ function BuilderCanvas({ projectId, isPreviewMode = false }: BuilderCanvasProps)
   const [editingCompositeNodeId, setEditingCompositeNodeId] = useState<string | null>(null);
   const [currentProject, setCurrentProject] = useState<ProjectData | null>(null);
   const [projectLoading, setProjectLoading] = useState(false);
+  const [projectBaseline, setProjectBaseline] = useState<{ nodes: FlowNode[]; edges: Edge[] } | null>(null);
+  const [showProjectTests, setShowProjectTests] = useState(false);
+  const [projectTestSuite, setProjectTestSuite] = useState<CompositeTestSuite>({ tests: [], results: [] });
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -78,6 +84,7 @@ function BuilderCanvas({ projectId, isPreviewMode = false }: BuilderCanvasProps)
           setCurrentProject(project);
           setNodes(project.nodes);
           setEdges(project.edges);
+          setProjectBaseline({ nodes: project.nodes, edges: project.edges });
         } else {
           toast.error('Project not found');
         }
@@ -111,6 +118,7 @@ function BuilderCanvas({ projectId, isPreviewMode = false }: BuilderCanvasProps)
         };
         await projectService.saveProject(updatedProject);
         setCurrentProject(updatedProject);
+        setProjectBaseline({ nodes: updatedProject.nodes, edges: updatedProject.edges });
       } catch (error) {
         console.error('Failed to auto-save project:', error);
       }
@@ -189,6 +197,22 @@ function BuilderCanvas({ projectId, isPreviewMode = false }: BuilderCanvasProps)
     toast.success('Flow restored');
   }, [setEdges, setNodes, setViewport]);
 
+  const onCancel = useCallback(() => {
+    if (projectBaseline) {
+      setNodes(projectBaseline.nodes);
+      setEdges(projectBaseline.edges);
+      toast.message('Reverted changes');
+    } else if (!projectId) {
+      // If no project, revert to last local save
+      onRestore();
+    }
+  }, [onRestore, projectBaseline, projectId, setEdges, setNodes]);
+
+  const onTestProject = useCallback(() => {
+    // Placeholder: toggle a simple tests drawer/panel for the project
+    setShowProjectTests((v) => !v);
+  }, []);
+
   const handleCopyNode = useCallback(() => {
     if (!contextMenu) return;
     navigator.clipboard.writeText(JSON.stringify(contextMenu.node, null, 2));
@@ -214,6 +238,22 @@ function BuilderCanvas({ projectId, isPreviewMode = false }: BuilderCanvasProps)
     setContextMenu(null);
   }, [contextMenu]);
 
+  const handleExportNode = useCallback(() => {
+    if (!contextMenu) return;
+    const node = contextMenu.node as Node;
+    downloadNodeAsJSON(node);
+    toast.success('Node exported as JSON');
+    setContextMenu(null);
+  }, [contextMenu]);
+
+  const handleExportTestParams = useCallback(() => {
+    if (!contextMenu) return;
+    const node = contextMenu.node as Node;
+    downloadTestParametersTemplate(node);
+    toast.success('Test parameters template exported');
+    setContextMenu(null);
+  }, [contextMenu]);
+
   return (
     <div className="relative h-full w-full">
       <GraphErrorBoundary>
@@ -234,28 +274,20 @@ function BuilderCanvas({ projectId, isPreviewMode = false }: BuilderCanvasProps)
           attributionPosition="top-right"
         >
           <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
-          <Panel position="top-right" className="flex gap-2">
-            {projectLoading && (
-              <div className="text-sm text-muted-foreground px-3 py-1.5">
-                Loading...
-              </div>
-            )}
-            {currentProject && (
-              <div className="text-sm text-muted-foreground px-3 py-1.5">
-                {isPreviewMode ? 'Preview:' : 'Editing:'} {currentProject.metadata.name}
-              </div>
-            )}
-            {!isPreviewMode && (
-              <>
-                <Button variant="outline" size="sm" onClick={onSave}>
-                  Save
-                </Button>
-                <Button variant="outline" size="sm" onClick={onRestore}>
-                  Restore
-                </Button>
-              </>
-            )}
-          </Panel>
+          {!isPreviewMode && (
+            <div className="absolute top-0 inset-x-0 z-40 h-16">
+              <Topbar
+                title={`Project: ${currentProject?.metadata.name ?? 'Untitled'}`}
+                subtitle={projectLoading ? 'Loading…' : undefined}
+                onSave={onSave}
+                onCancel={onCancel}
+                onTest={onTestProject}
+                showSave
+                showCancel
+                showTest
+              />
+            </div>
+          )}
         </FlowCanvas>
       </GraphErrorBoundary>
 
@@ -264,16 +296,24 @@ function BuilderCanvas({ projectId, isPreviewMode = false }: BuilderCanvasProps)
           className="fixed z-50 flex flex-col rounded border border-border bg-card text-sm shadow-lg"
           style={{ top: contextMenu.y, left: contextMenu.x }}
         >
-          <button className="px-4 py-2 text-left hover:bg-accent" onClick={handleCopyNode}>
+          <Button className="px-4 py-2 text-left hover:bg-accent" onClick={handleCopyNode}>
             Copy
-          </button>
-          <button className="px-4 py-2 text-left hover:bg-accent" onClick={handleCutNode}>
+          </Button>
+          <Button className="px-4 py-2 text-left hover:bg-accent" onClick={handleCutNode}>
             Cut
-          </button>
+          </Button>
           {contextMenu.node.type === 'composite-node' && (
-            <button className="px-4 py-2 text-left hover:bg-accent" onClick={handleEditNode}>
-              Edit
-            </button>
+            <>
+              <Button className="px-4 py-2 text-left hover:bg-accent" onClick={handleEditNode}>
+                Edit
+              </Button>
+              <Button className="px-4 py-2 text-left hover:bg-accent" onClick={handleExportNode}>
+                Export for CLI
+              </Button>
+              <Button className="px-4 py-2 text-left hover:bg-accent" onClick={handleExportTestParams}>
+                Export Test Template
+              </Button>
+            </>
           )}
         </div>
       )}
@@ -291,6 +331,40 @@ function BuilderCanvas({ projectId, isPreviewMode = false }: BuilderCanvasProps)
           <NodeDataMenu />
         </>
       )}
+
+      {showProjectTests && !isPreviewMode && (
+        <div className="fixed right-4 top-16 bottom-4 z-40 w-[520px] max-w-[95vw] rounded border bg-card shadow-xl flex flex-col">
+          <div className="border-b px-4 py-2 text-sm font-semibold">Project Tests</div>
+          <div className="flex-1 overflow-auto">
+            <CompositeTestingPanel
+              node={{
+                id: 'project',
+                type: 'composite-node',
+                position: { x: 0, y: 0 },
+                data: {
+                  // Treat current canvas as internal graph of a composite
+                  internalNodes: nodes as any,
+                  internalEdges: edges as any,
+                  inputs: deriveCompositeInputs(nodes as any),
+                  outputs: deriveCompositeOutputs(nodes as any, edges as any),
+                  enableTesting: true,
+                  testSuite: projectTestSuite,
+                  // minimal required base fields
+                  ref: 'project',
+                  entries: {},
+                  isModifiable: true,
+                  isResizable: true,
+                } as any,
+              } as any}
+              testSuite={projectTestSuite}
+              onTestSuiteChange={(suite) => setProjectTestSuite(suite)}
+            />
+          </div>
+          <div className="px-4 py-2 border-t flex justify-end">
+            <Button size="sm" variant="outline" onClick={() => setShowProjectTests(false)}>Close</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -299,13 +373,14 @@ function BuilderCanvas({ projectId, isPreviewMode = false }: BuilderCanvasProps)
 function CompositeEditorModal({ nodeId, onClose }: { nodeId: string; onClose: () => void }) {
   const { getNode, updateNodeData } = useReactFlow<Node>();
   const availableNodes = useMemo(
-    () => nodeDefinitions.filter((definition) => definition.category === 'Internal'),
+    () => nodeDefinitions,
     []
   );
 
   const [draftNodes, setDraftNodes] = useState<FlowNode[]>(() => {
     const target = getNode(nodeId);
-    return cloneNodes(readInternalNodes(target));
+    const nodes = cloneNodes(readInternalNodes(target));
+    return injectExternalValuesIntoInternalNodes(nodes, target);
   });
   const [draftEdges, setDraftEdges] = useState<Edge[]>(() => {
     const target = getNode(nodeId);
@@ -314,7 +389,8 @@ function CompositeEditorModal({ nodeId, onClose }: { nodeId: string; onClose: ()
 
   useEffect(() => {
     const target = getNode(nodeId);
-    setDraftNodes(cloneNodes(readInternalNodes(target)));
+    const nodes = cloneNodes(readInternalNodes(target));
+    setDraftNodes(injectExternalValuesIntoInternalNodes(nodes, target));
     setDraftEdges(cloneEdges(readInternalEdges(target)));
   }, [getNode, nodeId]);
 
@@ -361,20 +437,28 @@ function CompositeEditorModal({ nodeId, onClose }: { nodeId: string; onClose: ()
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black/60">
       <div className="flex h-full flex-col bg-card shadow-2xl">
-        <header className="flex items-center justify-between border-b border-border px-6 py-4">
-          <div>
-            <h2 className="text-lg font-semibold">{nodeName}</h2>
-            <p className="text-xs text-muted-foreground">Edit composite node internals</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleCancel}>
-              Cancel
-            </Button>
-            <Button size="sm" onClick={handleSave}>
-              Save
-            </Button>
-          </div>
-        </header>
+        <Topbar
+          title={`Node: ${nodeName}`}
+          subtitle="Edit composite node internals"
+          onCancel={handleCancel}
+          onSave={handleSave}
+          onTest={() => {
+            // Save, enable testing on node, and close to allow testing in canvas
+            const inputs = deriveCompositeInputs(draftNodes);
+            const outputs = deriveCompositeOutputs(draftNodes, draftEdges);
+            updateNodeData(nodeId, {
+              internalNodes: cloneNodes(draftNodes),
+              internalEdges: cloneEdges(draftEdges),
+              inputs,
+              outputs,
+              enableTesting: true,
+            });
+            onClose();
+          }}
+          showSave
+          showCancel
+          showTest
+        />
         <div className="flex-1 overflow-hidden">
           <InternalGraphEditor
             nodes={draftNodes}
@@ -415,57 +499,23 @@ function InternalGraphEditor({
   }, []);
 
   return (
-    <DndTypeProvider>
-      <div className="flex h-full">
-        <InternalSidebar availableNodes={availableNodes} onAddNode={addNodeHandler} />
-        <div className="flex-1">
-          <ReactFlowProvider>
-            <InternalWorkspace
-              initialNodes={nodes}
-              initialEdges={edges}
-              nodeTypes={nodeTypes}
-              onChange={onGraphChange}
-              onRegisterAddNode={handleRegisterAddNode}
-            />
-          </ReactFlowProvider>
-        </div>
+    <div className="flex h-full">
+      {/* Reuse existing global sidebar/context; do not render a new one here */}
+      <div className="flex-1 relative">
+        <ReactFlowProvider>
+          <InternalWorkspace
+            initialNodes={nodes}
+            initialEdges={edges}
+            nodeTypes={nodeTypes}
+            onChange={onGraphChange}
+            onRegisterAddNode={handleRegisterAddNode}
+          />
+          <div className="absolute top-0 right-0 h-full">
+            <NodeDataMenu />
+          </div>
+        </ReactFlowProvider>
       </div>
-    </DndTypeProvider>
-  );
-}
-
-type InternalSidebarProps = {
-  availableNodes: readonly InternalDefinition[];
-  onAddNode: (type: string) => void;
-};
-
-function InternalSidebar({ availableNodes, onAddNode }: InternalSidebarProps) {
-  const { setType } = useDnd();
-
-  const handleDragStart = (event: React.DragEvent<HTMLButtonElement>, nodeType: string) => {
-    setType(nodeType);
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('application/reactflow', nodeType);
-  };
-
-  return (
-    <aside className="w-60 overflow-y-auto border-r border-border bg-muted/40 p-3 text-sm">
-      <p className="mb-2 font-semibold">Internal Nodes</p>
-      <div className="flex flex-col gap-2">
-        {availableNodes.map((definition) => (
-          <button
-            key={definition.type}
-            draggable
-            onDragStart={(event) => handleDragStart(event, definition.type)}
-            onClick={() => onAddNode(definition.type)}
-            className="flex items-center gap-2 rounded border border-border bg-card px-2 py-1 text-left hover:bg-accent"
-          >
-            <definition.icon className="h-4 w-4" />
-            <span>{definition.label}</span>
-          </button>
-        ))}
-      </div>
-    </aside>
+    </div>
   );
 }
 
@@ -591,6 +641,49 @@ function readInternalEdges(node: Node | undefined): Edge[] {
     return stored as Edge[];
   }
   return [];
+}
+
+function injectExternalValuesIntoInternalNodes(internalNodes: FlowNode[], compositeNode: Node | undefined): FlowNode[] {
+  if (!compositeNode) {
+    return internalNodes;
+  }
+
+  // Get the external input values from the composite node's entries
+  const externalEntries = compositeNode.data.entries || {};
+  const compositeInputs = compositeNode.data.inputs as CompositeIO[] || [];
+
+  return internalNodes.map(node => {
+    if (node.type === 'internal-input') {
+      // Find the corresponding external input
+      const nodeHandleId = (node.data as any)?.handleId;
+      if (nodeHandleId) {
+        // Look for the external input value
+        const externalEntry = Object.values(externalEntries).find((entry: any) => {
+          // Match by handle ID in the entries
+          return entry.handleId === nodeHandleId;
+        });
+
+        if (externalEntry) {
+          // Inject the external value into the internal input node
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              value: externalEntry.value,
+              // Also set up the entries as if this value was connected internally
+              entries: {
+                external: {
+                  value: externalEntry.value,
+                  handleId: 'external'
+                }
+              }
+            }
+          };
+        }
+      }
+    }
+    return node;
+  });
 }
 
 function cloneNodes(nodes: FlowNode[]): FlowNode[] {

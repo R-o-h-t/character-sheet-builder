@@ -17,7 +17,7 @@ import {
   useReactFlow,
 } from '@xyflow/react';
 import type { MouseEvent, ReactNode } from 'react';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef, useEffect } from 'react';
 
 import { useDnd } from '@/lib/context/dnd.context';
 import { addNode } from './node-registry';
@@ -147,6 +147,29 @@ export function FlowCanvas({
     () => (isReadOnly ? undefined : onEdgesChange),
     [isReadOnly, onEdgesChange]
   );
+
+  // Disable delete key functionality globally
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Backspace' || event.key === 'Delete') {
+        // Prevent the default delete behavior unless the user is typing in an input field
+        const activeElement = document.activeElement;
+        const isInputField = activeElement?.tagName === 'INPUT' ||
+          activeElement?.tagName === 'TEXTAREA' ||
+          (activeElement as HTMLElement)?.contentEditable === 'true';
+
+        if (!isInputField) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, []);
 
   return (
     <div className={className ?? 'h-full w-full'}>

@@ -2,8 +2,8 @@ import { memo } from "react";
 import { cn } from "@/lib/utils";
 import { NodeProps, useReactFlow } from "@xyflow/react";
 import { CaseUpper } from "lucide-react";
-import { Resizable } from "../base/node-resizer";
 import { Node, NodeDefinition } from "../../node-registry";
+import { BaseFieldNode, NodeField } from "../base/base-field-node";
 
 const properties = {
   value: {
@@ -27,41 +27,53 @@ const properties = {
 
 type TextNodeProperties = typeof properties;
 
-const defaultSize = { width: 160, height: 50 };
+const defaultSize = { width: 220, height: 100 };
 
 function TextNode({ id, data, selected }: NodeProps<Node<TextNodeProperties>>) {
   const { updateNodeData } = useReactFlow();
+  // Cast data to access our custom fields property
+  const nodeData = data as typeof data & { fields?: NodeField[] };
+
+  const processFields = (fields: NodeField[], entries: Record<string, any>) => {
+    // Single-field node: prefer connected input, else fall back to property value
+    const field = fields[0];
+    const entry = field ? entries[field.handleId] : undefined;
+    const connected = entry && entry.value !== undefined && entry.value !== null;
+    return String(connected ? entry.value : data.value ?? '');
+  };
 
   return (
-    <Resizable
+    <BaseFieldNode
       id={id}
+      data={nodeData}
       selected={selected}
-      options={{
-        isResizable: data.isResizable !== false,
-        minWidth: defaultSize.width,
-        minHeight: defaultSize.height,
-        handles: {
-          target: null,
-        },
-      }} >
-      <div className={
-        cn("w-full h-full p-4 flex overflow-hidden",
+      title="Text"
+      icon={CaseUpper}
+      allowAddField={false}
+      allowRemoveField={false}
+      processFields={processFields}
+      customFieldRenderer={(field, _entry, onKeyChange) => (
+        <div key={field.id} className={cn("relative flex items-center gap-2 pl-6 w-full",
           getAlignmentClass(data.alignmentX, 'X'),
         )}>
-        {data.isModifiable ? (
+          {/* use hidden input for key to satisfy structure */}
+          <input
+            value={field.key}
+            onChange={(e) => onKeyChange(e.target.value)}
+            className="hidden"
+          />
           <input
             type="string"
-            value={data.value}
+            value={String(data.value ?? '')}
             onChange={(e) => updateNodeData(id, { value: e.target.value })}
             className={cn("bg-transparent border-b border-gray-300 focus:outline-none focus:border-blue-500 text-center w-full max-w-full",
               getTextAlignmentClass(data.alignmentX),
             )}
+            readOnly={!data.isModifiable}
           />
-        ) : (
-          data.value
-        )}
-      </div>
-    </Resizable>
+        </div>
+      )}
+    />
   );
 }
 
