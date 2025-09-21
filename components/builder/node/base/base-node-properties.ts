@@ -1,5 +1,3 @@
-import { NodeProperties } from "../../node-registry";
-
 export const baseProperties = {
   // id: {
   //   type: 'id' as const,
@@ -15,15 +13,6 @@ export const baseProperties = {
 
 export type BaseNodeProperties = typeof baseProperties;
 
-const getRandomColor = () => {
-  const letters = '0123456789ABCDEF';
-  let color = '#';
-  for (let i = 0; i < 6; i++) {
-    color += letters[Math.floor(Math.random() * 16)];
-  }
-  return color;
-}
-
 export const generateReadableId = () => {
   const adjectives = ['RED', 'BLUE', 'GREEN', 'FAST', 'SLOW', 'BIG', 'SMALL'];
   const nouns = ['CAR', 'TREE', 'ROCK', 'STAR', 'MOON', 'SUN', 'BIRD'];
@@ -36,5 +25,4 @@ export const generateBaseProperties = () => ({
   // id: generateReadableId(),
   // color: getRandomColor(),
 });
-
 

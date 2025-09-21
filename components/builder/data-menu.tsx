@@ -3,8 +3,10 @@ import { Copy } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "../ui/button";
+import { ErrorBoundary } from "../error-boundary/error-boundary";
 import { getNodeDefinition, Node, NodeDefinition } from "./node-registry";
 import { NodeDataFormulaUpdater } from "./node/formula/formula-data-updater";
+import { formatValue, isErrorValue } from "./node/utils/value";
 
 
 export default function NodeDataMenu() {
@@ -21,7 +23,7 @@ export default function NodeDataMenu() {
     if (newSelectedId !== selectedNodeId) {
       setSelectedNodeId(newSelectedId);
     }
-  }); // No dependency array - runs on every render
+  }, [getNodes, selectedNodeId]);
 
   // Backup selection handler
   const onChange: OnSelectionChangeFunc<Node, Edge> = useCallback(({ nodes }) => {
@@ -34,17 +36,38 @@ export default function NodeDataMenu() {
   });
 
   return (
-    <aside className="bg-card opacity-80 border-2 p-4 w-84 h-full absolute top-0 right-0 flex flex-col gap-2">
-      {selectedNodeId && (
-        <>
-          {/* <BasePropertiesEditor key={`base-${selectedNodeId}`} id={selectedNodeId} /> */}
-          <NodeInfoView key={`info-${selectedNodeId}`} id={selectedNodeId} />
-          <NodeDataJsonView key={`json-${selectedNodeId}`} id={selectedNodeId} />
-          <NodeDataUpdateForm key={`form-${selectedNodeId}`} id={selectedNodeId} />
-          <NodeEntriesView key={`entries-${selectedNodeId}`} id={selectedNodeId} />
-        </>
-      )}
-    </aside>
+    <ErrorBoundary
+      level="app"
+      fallback={
+        <aside className="bg-card opacity-80 border-2 p-4 w-84 h-full absolute top-0 right-0 flex flex-col gap-2">
+          <div className="text-sm text-muted-foreground">
+            Error loading data menu
+          </div>
+        </aside>
+      }
+    >
+      <aside className="bg-card opacity-80 border-2 p-4 w-84 h-full absolute top-0 right-0 flex flex-col gap-2">
+        {selectedNodeId && (
+          <>
+            <ErrorBoundary level="node" fallback={<div className="text-xs text-red-500">Error loading node info</div>}>
+              <NodeInfoView key={`info-${selectedNodeId}`} id={selectedNodeId} />
+            </ErrorBoundary>
+            <ErrorBoundary level="node" fallback={<div className="text-xs text-red-500">Error loading error banner</div>}>
+              <NodeErrorBanner key={`error-${selectedNodeId}`} id={selectedNodeId} />
+            </ErrorBoundary>
+            <ErrorBoundary level="node" fallback={<div className="text-xs text-red-500">Error loading JSON view</div>}>
+              <NodeDataJsonView key={`json-${selectedNodeId}`} id={selectedNodeId} />
+            </ErrorBoundary>
+            <ErrorBoundary level="node" fallback={<div className="text-xs text-red-500">Error loading update form</div>}>
+              <NodeDataUpdateForm key={`form-${selectedNodeId}`} id={selectedNodeId} />
+            </ErrorBoundary>
+            <ErrorBoundary level="node" fallback={<div className="text-xs text-red-500">Error loading entries view</div>}>
+              <NodeEntriesView key={`entries-${selectedNodeId}`} id={selectedNodeId} />
+            </ErrorBoundary>
+          </>
+        )}
+      </aside>
+    </ErrorBoundary>
   );
 }
 
@@ -75,24 +98,24 @@ export function NodeEntriesView({ id }: { id: string }) {
                     onClick={() => {
                       // copy the id to clipboard
                       navigator.clipboard.writeText(key);
-                      toast.success("Node ID copied to clipboard");
+                      toast.success("Handle ID copied to clipboard");
                     }}
                   >
                     {key}
                   </span>
-                  {/* handle */}
-                  {entry.handle && (
-                    <span className="text-sm text-gray-500">
-                      (Handle: {entry.handle})
+                  {entry.sourceRef && (
+                    <span
+                      className="text-xs text-muted-foreground cursor-pointer"
+                      onClick={() => {
+                        navigator.clipboard.writeText(entry.sourceRef ?? '');
+                        toast.success("Source ref copied to clipboard");
+                      }}
+                    >
+                      source: {entry.sourceRef}
                     </span>
                   )}
-                  {/* value */}
                   <span className="text-sm text-gray-500">
-                    {
-                      typeof entry.value === 'object' && entry.value !== null
-                        ? `Object{${Object.keys(entry.value).length} keys}`
-                        : `Value: ${entry.value}`
-                    }
+                    Value: {formatValue(entry.value)}
                   </span>
                 </li>
               ))}
@@ -159,6 +182,27 @@ export function NodeInfoView({ id }: { id: string }) {
 }
 
 
+export function NodeErrorBanner({ id }: { id: string }) {
+  const node = useNodesData<Node>(id);
+  if (!node) {
+    return null;
+  }
+
+  const value = node.data?.value;
+  if (!isErrorValue(value)) {
+    return null;
+  }
+
+  return (
+    <div className="rounded border border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">
+      <span className="font-semibold">Error:</span> {value.error}
+    </div>
+  );
+}
+
+
+
+
 
 export function NodeDataUpdateForm({ id }: { id: string }) {
 
@@ -189,7 +233,7 @@ export function NodeDataUpdateForm({ id }: { id: string }) {
   }
 
 
-  function _updateNodeData(propertyKey: string, value: any) {
+  function _updateNodeData(propertyKey: string, value: unknown) {
     if (!node || !definition || !definition.properties) {
       return;
     }
@@ -247,13 +291,13 @@ export function NodeDataUpdateForm({ id }: { id: string }) {
                   label={prop.label || key}
                   value={node.data[key] as number}
                   min={
-                    key === "value" ? node.data.min :
-                      key === "max" ? node.data.min :
+                    key === "value" ? (node.data.min as number | undefined) :
+                      key === "max" ? (node.data.min as number | undefined) :
                         undefined
                   }
                   max={
-                    key === "value" ? node.data.max :
-                      key === "max" ? node.data.max :
+                    key === "value" ? (node.data.max as number | undefined) :
+                      key === "max" ? (node.data.max as number | undefined) :
                         undefined
                   }
                   onChange={(value) => _updateNodeData(key, value)}
@@ -262,7 +306,6 @@ export function NodeDataUpdateForm({ id }: { id: string }) {
             case 'formula':
               return (
                 <NodeDataFormulaUpdater
-                  nodeId={node.id}
                   key={key}
                   label={prop.label || key}
                   value={node.data[key] as string}
@@ -488,7 +531,7 @@ export function NodeDataColorUpdater({
 }
 
 
-export function toReadableValue(value: any): string {
+export function toReadableValue(value: unknown): string {
   if (typeof value === 'object' && value !== null) {
     return "Object{" + Object.keys(value).length + " keys}";
   }

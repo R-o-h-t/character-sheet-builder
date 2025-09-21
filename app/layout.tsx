@@ -4,6 +4,8 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { LayoutMenu } from "@/components/layout/layout-menu";
+import { ProjectManagerProvider } from "@/lib/context/project-manager.context";
+import { AppErrorBoundary } from "@/components/error-boundary/error-boundary";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,18 +32,22 @@ export default function RootLayout({
       <html lang="en" suppressHydrationWarning>
         <head />
         <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased relative`}>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <LayoutMenu />
-            <div className="h-full w-full flex flex-col items-center justify-center">
-              {children}
-            </div>
-            <Toaster />
-          </ThemeProvider>
+          <AppErrorBoundary>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+            >
+              <ProjectManagerProvider>
+                <LayoutMenu />
+                <div className="h-full w-full flex flex-col items-center justify-center">
+                  {children}
+                </div>
+                <Toaster />
+              </ProjectManagerProvider>
+            </ThemeProvider>
+          </AppErrorBoundary>
         </body>
       </html>
     </>

@@ -1,10 +1,42 @@
 import { Button } from '@/components/ui/button';
-import { Connection, Edge, Handle, NodeResizer, NodeToolbar, Position, useNodeConnections, useNodesData, useOnSelectionChange, useReactFlow } from '@xyflow/react';
+import { Connection, Edge, Handle, NodeToolbar, Position, useNodeConnections, useNodesData, useOnSelectionChange, useReactFlow, useUpdateNodeInternals } from '@xyflow/react';
 import { Trash } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, JSX } from 'react';
 import { toast } from 'sonner';
 import { Node } from '../../node-registry';
+import { isErrorValue } from '../utils/value';
 
+type HandleDefinition = {
+  id: string;
+  position?: Position;
+  maxConnections?: number;
+};
+
+type HandleOptions = {
+  position?: Position;
+  separateHandles?: boolean;
+  maxConnections?: number;
+  definitions?: HandleDefinition[];
+  onConnect?: (connections: Connection[]) => void;
+  onDisconnect?: (connections: Connection[]) => void;
+} | null;
+
+type ResizableOptions = {
+  minWidth?: number;
+  minHeight?: number;
+  isResizable?: boolean;
+  handles?: {
+    target?: HandleOptions;
+    source?: HandleOptions;
+  };
+  edges?: {
+    highlightedConnectionsTo?: string[];
+    highlightedColor?: string;
+    animateHighlight?: boolean;
+    color?: string;
+  };
+};
 
 export function Resizable({
   id,
@@ -14,45 +46,20 @@ export function Resizable({
   id: string;
   children: React.ReactNode;
   selected: boolean;
-  options?: {
-    minWidth?: number;
-    minHeight?: number;
-    isResizable?: boolean;
-    handles?: {
-      target?: {
-        position?: Position;
-        separateHandles?: boolean;
-        maxConnections?: number;
-        onConnect?: (connections: Connection[]) => void;
-        onDisconnect?: (connections: Connection[]) => void;
-      } | null;
-      source?: {
-        position?: Position;
-        separateHandles?: boolean;
-        maxConnections?: number;
-        onConnect?: (connections: Connection[]) => void;
-        onDisconnect?: (connections: Connection[]) => void;
-      } | null;
-    }
-    edges?: {
-      highlightedConnectionsTo?: string[];
-      highlightedColor?: string;
-      animateHighlight?: boolean;
-      color?: string;
-    };
-  };
+  options?: ResizableOptions;
 }) {
 
   // implement delete current node logic here
-  const { deleteElements, addNodes, addEdges, getEdges, setEdges, getNodes, updateNodeData } = useReactFlow<Node>();
+  const { deleteElements, addNodes, addEdges, getEdges, setEdges, updateNodeData } = useReactFlow<Node>();
+
+  const updateNodeInternals = useUpdateNodeInternals();
 
   const [isWaitingForConfirmation, setIsWaitingForConfirmation] = useState(false);
 
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
 
   const onSelectionChange = useCallback((changes: { nodes: Node[]; edges: Edge[] }) => {
-    console.log('onSelectionChange', changes);
-    const selectedNodeIds = changes.nodes.map(node => node.id);
+    const selectedNodeIds = changes.nodes.map((node) => node.id);
     setSelectedNodes(selectedNodeIds);
   }, []);
 
@@ -62,6 +69,23 @@ export function Resizable({
   const selected = useMemo(() => {
     return selectedNodes.includes(id);
   }, [id, selectedNodes]);
+
+  const currentNode = useNodesData<Node>(id);
+
+  const nodeHasError = useMemo(() => {
+    if (!currentNode) {
+      return false;
+    }
+    return isErrorValue(currentNode.data?.value);
+  }, [currentNode]);
+
+  const errorMessage = useMemo(() => {
+    if (!nodeHasError || !currentNode) {
+      return undefined;
+    }
+    const value = currentNode.data?.value as { error: string };
+    return value?.error;
+  }, [nodeHasError, currentNode]);
 
   const handleDelete = async () => {
     if (isWaitingForConfirmation) {
@@ -118,64 +142,125 @@ export function Resizable({
   const connections = useNodeConnections({
     handleType: 'target',
   });
-  const sourceNodesId: {
-    nodeId: string;
-    handleId: string | null;
-  }[] = useMemo(() => {
-    return connections
-      .map(connection => ({
-        nodeId: connection.source,
-        handleId: connection.targetHandle
-      }))
-  }, [connections]);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const sourceNodesData = useNodesData<Node>(sourceNodesId.map(({ nodeId }) => nodeId).filter(nodeId => nodeId && nodeId !== id));
+  const sourceNodeIds = useMemo(() => {
+    const identifiers = new Set<string>();
+    connections.forEach((connection) => {
+      if (connection.source && connection.source !== id) {
+        identifiers.add(connection.source);
+      }
+    });
+    return Array.from(identifiers);
+  }, [connections, id]);
+
+  const sourceNodesData = useNodesData<Node>(sourceNodeIds);
 
   // set the node data.entries to the source nodes data.value
   useEffect(() => {
-    const entries: Record<string, { value: any; handle?: string }> = {};
-    sourceNodesData.forEach(node => {
-      const handleId = sourceNodesId.find(source => source.nodeId === node.id)?.handleId?.replace(`${id}-target`, '')?.replace('-', '');
-      if (node.data.value !== undefined) {
-        entries[node.data.ref] = {
-          value: node.data.value,
-          handle: handleId || undefined
-        };
-      }
-    });
-    updateNodeData(id, { entries });
-  }, [sourceNodesData, sourceNodesId, id, updateNodeData]);
+    const lookup = new Map(sourceNodesData.map((node) => [node.id, node]));
+    const entries: Record<string, {
+      value: unknown;
+      handleId: string;
+      sourceNodeId?: string;
+      sourceHandleId?: string;
+      sourceRef?: string;
+    }> = {};
 
+    connections.forEach((connection) => {
+      const targetHandleId = normalizeHandleId(connection.targetHandle, id, 'target');
+      if (!targetHandleId) {
+        return;
+      }
+
+      const sourceNode = lookup.get(connection.source);
+      if (!sourceNode) {
+        return;
+      }
+
+      const sourceHandleId = normalizeHandleId(connection.sourceHandle, connection.source, 'source');
+      const value = getHandleSpecificValue(sourceNode.data, sourceHandleId);
+
+      if (value === undefined) {
+        return;
+      }
+
+      entries[targetHandleId] = {
+        value,
+        handleId: targetHandleId,
+        sourceNodeId: connection.source,
+        sourceHandleId,
+        sourceRef: sourceNode.data.ref,
+      };
+    });
+
+    updateNodeData(id, { entries });
+  }, [connections, id, sourceNodesData, updateNodeData]);
+
+
+  const isHighlighted = useCallback((edge: Edge) => {
+    return (
+      (edge.source === id || edge.target === id) &&
+      selected &&
+      (options?.edges?.highlightedConnectionsTo?.includes(edge.target) ||
+        options?.edges?.highlightedConnectionsTo?.includes(edge.source))
+    );
+  }, [id, options?.edges?.highlightedConnectionsTo, selected]);
+
+  const isSelected = useCallback((edge: Edge) => {
+    return (edge.source === id || edge.target === id) && selected;
+  }, [id, selected]);
 
   useEffect(() => {
     const edges = getEdges();
-    const updatedEdges = edges
-      .map(edge => {
-        if (edge.source !== id && edge.target !== id) {
-          return edge;
-        }
-        return {
-          ...edge,
-          style: {
-            ...edge.style,
-            opacity: (edge.source === id || edge.target === id) && selected ? 1 : 0.4,
-            stroke: (isHighlighted(edge) && options?.edges?.highlightedColor) ? options?.edges?.highlightedColor : isSelected(edge) ? options?.edges?.color || '#ff0071' : '#ccc',
-            transition: 'opacity 0.2s ease'
-          },
-        }
-      });
+    const updatedEdges = edges.map(edge => {
+      if (edge.source !== id && edge.target !== id) {
+        return edge;
+      }
+      return {
+        ...edge,
+        style: {
+          ...edge.style,
+          opacity: (edge.source === id || edge.target === id) && selected ? 1 : 0.4,
+          stroke: isHighlighted(edge)
+            ? options?.edges?.highlightedColor ?? options?.edges?.color ?? '#ff0071'
+            : isSelected(edge)
+              ? options?.edges?.color || '#ff0071'
+              : '#ccc',
+          transition: 'opacity 0.2s ease',
+        },
+      };
+    });
     setEdges(updatedEdges);
-  }, [selected, id, getEdges, setEdges, options?.edges?.highlightedConnectionsTo]);
+  }, [getEdges, id, isHighlighted, isSelected, options?.edges?.color, options?.edges?.highlightedColor, selected, setEdges]);
 
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') {
+      return;
+    }
 
+    const element = containerRef.current;
+    if (!element) {
+      return;
+    }
 
-  function isHighlighted(edge: Edge) {
-    return (edge.source === id || edge.target === id) && selected && (options?.edges?.highlightedConnectionsTo?.includes(edge.target) || options?.edges?.highlightedConnectionsTo?.includes(edge.source));
-  }
+    let frame: number | null = null;
+    const observer = new ResizeObserver(() => {
+      if (frame) {
+        cancelAnimationFrame(frame);
+      }
+      frame = requestAnimationFrame(() => updateNodeInternals(id));
+    });
 
-  function isSelected(edge: Edge) {
-    return (edge.source === id || edge.target === id) && selected;
-  }
+    observer.observe(element);
+
+    return () => {
+      if (frame) {
+        cancelAnimationFrame(frame);
+      }
+      observer.disconnect();
+    };
+  }, [id, updateNodeInternals]);
 
   return (
     <>
@@ -193,12 +278,6 @@ export function Resizable({
           <Trash className="h-4 w-4" />
         </Button>
       </NodeToolbar>
-      <NodeResizer
-        color="#ff0071"
-        isVisible={selected && options?.isResizable !== false}
-        minWidth={100}
-        minHeight={50}
-      />
       {
         getHandles({
           nodeId: id,
@@ -207,7 +286,12 @@ export function Resizable({
         })
       }
 
-      <div className="w-full h-full bg-accent rounded-lg">
+      <div
+        ref={containerRef}
+        className={`inline-flex min-w-[160px] max-w-xl flex-col rounded-lg bg-accent ${nodeHasError ? 'border-2 border-destructive shadow-inner' : ''}`}
+        style={{ width: 'auto', height: 'auto' }}
+        title={errorMessage}
+      >
         {children}
       </div>
       {
@@ -221,90 +305,132 @@ export function Resizable({
   );
 };
 
+function normalizeHandleId(rawId: string | null | undefined, nodeId: string, type: 'target' | 'source'): string | undefined {
+  if (!rawId) {
+    return undefined;
+  }
+
+  let trimmed = rawId;
+  if (trimmed.startsWith(`${nodeId}-`)) {
+    trimmed = trimmed.slice(`${nodeId}-`.length);
+  }
+  if (trimmed.startsWith(`${type}-`)) {
+    trimmed = trimmed.slice(`${type}-`.length);
+  }
+  return trimmed;
+}
+
+function getHandleSpecificValue(data: Node['data'], handleId?: string) {
+  const handleValues = (data as unknown as { handleValues?: Record<string, unknown> }).handleValues;
+  if (handleId && handleValues && handleId in handleValues) {
+    return handleValues[handleId];
+  }
+  return data.value;
+}
+
 const getHandles = ({
   nodeId,
   type,
   options
 }: {
-  nodeId: string,
-  type: 'target' | 'source',
-  options?: {
-    handles?: {
-      target?: {
-        position?: Position;
-        maxConnections?: number;
-        separateHandles?: boolean;
-      } | null;
-      source?: {
-        position?: Position;
-        maxConnections?: number;
-        separateHandles?: boolean;
-      } | null;
-    };
-  }
+  nodeId: string;
+  type: 'target' | 'source';
+  options?: ResizableOptions;
 }) => {
-  if (type === 'target' && options?.handles?.target === null) {
-    return <></>
-  }
-  if (type === 'source' && options?.handles?.source === null) {
-    return <></>
+  const config = options?.handles?.[type];
+
+  if (config === null) {
+    return <></>;
   }
 
+  const defaultPosition = config?.position ?? (type === 'target' ? Position.Left : Position.Right);
+  const handlesToRender: JSX.Element[] = [];
 
-  if (!options?.handles?.[type]?.separateHandles || !options?.handles?.[type]?.maxConnections) {
-    return (
+  if (config?.definitions && config.definitions.length > 0) {
+    config.definitions.forEach((definition) => {
+      handlesToRender.push(
+        <MaxConnectionsHandle
+          id={`${nodeId}-${type}-${definition.id}`}
+          key={`${nodeId}-${type}-${definition.id}`}
+          type={type}
+          position={definition.position ?? defaultPosition}
+          style={multiHandleStyle}
+          maxConnections={definition.maxConnections ?? config.maxConnections ?? 1}
+        />
+      );
+    });
+  } else if (!config?.separateHandles || !config?.maxConnections) {
+    handlesToRender.push(
       <MaxConnectionsHandle
         id={`${nodeId}-${type}`}
         key={`${nodeId}-${type}`}
         type={type}
-        position={options?.handles?.[type]?.position || (type === 'target' ? Position.Left : Position.Right)}
-        maxConnections={options?.handles?.[type]?.maxConnections}
+        position={defaultPosition}
+        maxConnections={config?.maxConnections}
       />
     );
+  } else {
+    for (let i = 0; i < config.maxConnections; i++) {
+      handlesToRender.push(
+        <MaxConnectionsHandle
+          id={`${nodeId}-${type}-${i}`}
+          key={`${nodeId}-${type}-${i}`}
+          type={type}
+          position={defaultPosition}
+          style={multiHandleStyle}
+          maxConnections={1}
+        />
+      );
+    }
   }
 
-  // If separate handles and maxConnections are defined, create multiple handles
-
-  const handles = [];
-  for (let i = 0; i < options.handles[type].maxConnections; i++) {
-    handles.push(
-      <MaxConnectionsHandle
-        id={`${nodeId}-${type}-${i}`}
-        key={`${nodeId}-${type}-${i}`}
-        type={type}
-        position={options?.handles?.[type]?.position || (type === 'target' ? Position.Left : Position.Right)}
-        style={{
-          position: 'relative',
-          top: 0,
-          left: 0,
-          right: 0,
-          transform: 'none'
-        }}
-        maxConnections={1}
-      />
-
-    );
+  if (handlesToRender.length === 0) {
+    return <></>;
   }
 
+  if (
+    handlesToRender.length === 1 &&
+    !(config?.definitions && config.definitions.length > 0) &&
+    (!config?.separateHandles || !config?.maxConnections)
+  ) {
+    return handlesToRender[0];
+  }
 
   return (
-    <div style={{
-      position: 'absolute',
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'space-around',
-      gap: '4px',
-      top: 0,
-      ...{
-        [type === 'target' ? 'left' : 'right']: 0,
-        height: '100%',
-        transform: type === 'target' ? 'translateX(-50%)' : 'translateX(50%)'
-      }
-    }}>
-      {handles}
+    <div style={getHandleContainerStyle(type)}>
+      {handlesToRender}
     </div>
-  )
+  );
 };
+
+const multiHandleStyle: CSSProperties = {
+  position: 'relative',
+  top: 0,
+  left: 0,
+  right: 0,
+  transform: 'none',
+};
+
+function getHandleContainerStyle(type: 'target' | 'source'): CSSProperties {
+  const style: CSSProperties = {
+    position: 'absolute',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-around',
+    gap: '4px',
+    top: 0,
+    height: '100%',
+    transform: type === 'target' ? 'translateX(-50%)' : 'translateX(50%)',
+  };
+
+  if (type === 'target') {
+    style.left = 0;
+  } else {
+    style.right = 0;
+  }
+
+  return style;
+}
 
 function MaxConnectionsHandle({ maxConnections, id, ...props }: React.ComponentProps<typeof Handle> & { maxConnections?: number, id: string }) {
   const connections = useNodeConnections({

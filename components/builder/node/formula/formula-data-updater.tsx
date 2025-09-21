@@ -1,12 +1,10 @@
 // import { FormulaEditor } from "./bkup.formula-editor";
 
 export function NodeDataFormulaUpdater({
-  nodeId,
   value,
   label,
   onChange
 }: {
-  nodeId: string;
   value: string;
   label: string;
   onChange: (value: string) => void;

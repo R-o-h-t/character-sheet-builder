@@ -4,7 +4,7 @@
 import { Button } from "@/components/ui/button";
 import { NodeProps, useNodeConnections, useNodesData, useReactFlow } from "@xyflow/react";
 import { ArrowDownToDot, Copy } from "lucide-react";
-import { memo, useMemo } from "react";
+import { memo, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { Node, NodeDefinition } from '../../node-registry';
 import { Resizable } from "../base/node-resizer";
@@ -44,9 +44,9 @@ function RefNode({ id, data, selected }: NodeProps<Node<RefNodeProperties>>) {
   const sourceNodesData = useNodesData<Node>(sourceNodeIds);
 
   // set data.value to sourceNode.data.value
-  useMemo(() => {
+  useEffect(() => {
     updateNodeData(id, { value: sourceNodesData[0]?.data.value });
-  }, [sourceNodesData]);
+  }, [id, sourceNodesData, updateNodeData]);
 
   return (
     <Resizable

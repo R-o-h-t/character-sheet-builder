@@ -1,16 +1,27 @@
-import { NodeProps, useReactFlow } from "@xyflow/react";
-import assert from "assert";
-import { Radical } from "lucide-react";
+import { NodeProps, Position, useReactFlow } from '@xyflow/react';
+import assert from 'assert';
+import { Radical } from 'lucide-react';
 import * as math from 'mathjs';
-import { memo, useMemo } from "react";
+import { ChangeEvent, memo, useEffect, useMemo } from 'react';
 import { Node, NodeDefinition } from '../../../node-registry';
-import { Resizable } from "../../base/node-resizer";
+import { Resizable } from '../../base/node-resizer';
+import {
+  EntryValue,
+  createError,
+  isErrorValue,
+  toNumber,
+} from '../../utils/value';
 
 const formulaNodeData = {
   formula: {
-    label: "Formula",
-    type: "formula" as const,
-    value: ""
+    label: 'Formula',
+    type: 'formula' as const,
+    value: '',
+  },
+  outputs: {
+    label: 'Outputs (comma separated)',
+    type: 'string' as const,
+    value: 'result',
   },
 };
 
@@ -18,21 +29,42 @@ const formulaNodeData = {
 
 type FormulaNodeProperties = typeof formulaNodeData
 
-const defaultSize = { width: 160, height: 50 };
+const defaultSize = { width: 240, height: 160 };
 
-function FormulaNode({ id, data, selected }: NodeProps<Node<FormulaNodeProperties, number | undefined>>) {
-
+function FormulaNode({ id, data, selected }: NodeProps<Node<FormulaNodeProperties, number | { error: string } | Record<string, number | { error: string }>>>) {
   const { updateNodeData } = useReactFlow<Node>();
 
-  const result = useMemo(() => {
-    return getResult(data.formula, data.entries, data.ref);
-  }, [data.formula, data.ref, data.entries]);
+  const outputHandles = useMemo(() => deriveOutputHandles(data.outputs), [data.outputs]);
 
-  // Update node data with computed result
-  useMemo(() => {
-    updateNodeData(id, { value: result });
-  }, [result, id, updateNodeData]);
+  const evaluation = useMemo(() => {
+    return evaluateFormula({
+      formula: data.formula,
+      entries: data.entries,
+      selfRef: data.ref,
+    });
+  }, [data.formula, data.entries, data.ref]);
 
+  const handleValues = useMemo(() => {
+    const map: Record<string, number | { error: string }> = {};
+    outputHandles.forEach((handle) => {
+      map[handle] = evaluation;
+    });
+    return map;
+  }, [outputHandles, evaluation]);
+
+  useEffect(() => {
+    const payload = outputHandles.length === 1 ? evaluation : handleValues;
+    updateNodeData(id, {
+      value: payload,
+      handleValues,
+    });
+  }, [id, evaluation, handleValues, outputHandles, updateNodeData]);
+
+  const tokens = useMemo(() => Array.from(extractTokens(data.formula)), [data.formula]);
+
+  const handleFormulaChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    updateNodeData(id, { formula: event.target.value });
+  };
 
   return (
     <Resizable
@@ -42,76 +74,143 @@ function FormulaNode({ id, data, selected }: NodeProps<Node<FormulaNodePropertie
         isResizable: true,
         minWidth: defaultSize.width,
         minHeight: defaultSize.height,
-      }} >
-      {/* display only the result */}
-      <div className="w-full h-full p-4 flex items-center justify-center">
-        <span className="text-lg font-mono">
-          {result !== undefined ? result.toFixed(2) : 'N/A'}
-        </span>
+        handles: {
+          target: {
+            position: Position.Left,
+            separateHandles: true,
+            maxConnections: Math.max(tokens.length, 1),
+          },
+          source:
+            outputHandles.length > 1
+              ? {
+                  position: Position.Right,
+                  separateHandles: true,
+                  definitions: outputHandles.map((handle) => ({
+                    id: handle,
+                  })),
+                }
+              : {
+                  position: Position.Right,
+                  separateHandles: false,
+                },
+        },
+      }}
+    >
+      <div className="flex h-full w-full flex-col gap-2 p-3">
+        <header className="flex items-center justify-between text-sm font-semibold">
+          <span>Formula</span>
+          <span className="text-xs text-muted-foreground">mathjs expression</span>
+        </header>
+        <textarea
+          value={data.formula}
+          onChange={handleFormulaChange}
+          placeholder="e.g. (A + B) / 2"
+          className="h-24 resize-none rounded border border-border bg-background p-2 text-xs font-mono focus:outline-none focus:ring-1"
+        />
       </div>
     </Resizable>
   );
 }
 
 export const definition: NodeDefinition<FormulaNodeProperties> = {
-  type: 'formula',
+  type: 'number-formula',
   icon: Radical,
-  label: 'Formula Node',
+  label: 'Formula',
   properties: formulaNodeData,
   component: memo(FormulaNode),
   defaultSize,
   isResizable: true,
   isModifiable: true,
+  category: 'Number',
 };
-
 
 export default definition;
 
+type EvaluateArgs = {
+  formula: string;
+  entries: Record<string, EntryValue>;
+  selfRef?: string;
+};
 
-export const getResult = (formula: string, allNodes: Record<string, { value: any }>, selfRef?: string): number | undefined => {
+const TOKEN_REGEX = /([A-Z_][A-Z0-9_]*(?:\.[A-Z_][A-Z0-9_]*)*)/gi;
+
+function extractTokens(formula: string): Set<string> {
+  const tokens = new Set<string>();
+  if (!formula) {
+    return tokens;
+  }
+  let match: RegExpExecArray | null;
+  const regex = new RegExp(TOKEN_REGEX);
+  while ((match = regex.exec(formula)) !== null) {
+    tokens.add(match[1]);
+  }
+  return tokens;
+}
+
+export function evaluateFormula({ formula, entries, selfRef }: EvaluateArgs): number | { error: string } {
+  if (!formula.trim()) {
+    return createError('Formula is empty');
+  }
+
   try {
-
-    // Replace all node references (UPPER_CASE with optional dot notation)
-    formula = formula.replace(/([A-Z_]+(?:\.[A-Z_]+)*)/g, (match) => {
+    const replaced = formula.replace(TOKEN_REGEX, (match) => {
       const parts = match.split('.');
       const nodeRef = parts[0];
 
       if (selfRef) {
-        assert(nodeRef !== selfRef, "Cannot reference self in formula");
+        assert(nodeRef !== selfRef, 'Cannot reference self in formula');
       }
 
-      const node = allNodes[nodeRef];
-      if (node) {
-        // Start with the node's value
-        let value = node.value;
+      const nodeEntry = entries[nodeRef];
+      if (!nodeEntry) {
+        throw new Error(`Unknown reference ${nodeRef}`);
+      }
 
-        // Navigate through the property chain
-        for (let i = 1; i < parts.length; i++) {
-          const property = parts[i];
-          if (value && typeof value === 'object' && property in value) {
-            value = value[property];
-          } else {
-            console.warn(`Property "${property}" not found in node "${nodeRef}" for formula "${formula}"`);
-            return match; // Return the original match if property not found
-          }
+      if (isErrorValue(nodeEntry.value)) {
+        throw new Error(nodeEntry.value.error);
+      }
+
+      let current: unknown = nodeEntry.value;
+      for (let i = 1; i < parts.length; i++) {
+        const property = parts[i];
+        if (current && typeof current === 'object' && property in (current as Record<string, unknown>)) {
+          current = (current as Record<string, unknown>)[property];
+        } else {
+          throw new Error(`Property ${property} not found on ${nodeRef}`);
         }
+      }
 
-        return value;
+      const numeric = toNumber(current);
+      if (numeric === null) {
+        throw new Error(`Reference ${match} is not numeric`);
       }
-      else {
-        console.warn(`Node reference "${nodeRef}" not found in formula "${formula}"`);
-      }
-      return match;
+
+      return String(numeric);
     });
 
-    // Evaluate the formula using mathjs
-    const result = math.evaluate(formula);
-
-    if (typeof result === 'number') {
+    const result = math.evaluate(replaced);
+    if (typeof result === 'number' && Number.isFinite(result)) {
       return result;
     }
+    throw new Error('Formula did not resolve to a number');
+  } catch (error) {
+    if (error instanceof Error) {
+      return createError(error.message);
+    }
+    return createError('Formula evaluation failed');
   }
-  catch (error) {
-    return undefined;
+}
+
+function deriveOutputHandles(raw?: string): string[] {
+  if (!raw) {
+    return ['result'];
   }
+
+  const handles = raw
+    .split(',')
+    .map((segment) => segment.trim())
+    .map((segment) => segment.replace(/[^a-zA-Z0-9_-]/g, '_'))
+    .filter((segment) => segment.length > 0);
+
+  return handles.length ? handles : ['result'];
 }
